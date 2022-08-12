@@ -9,7 +9,6 @@
 use crate::list::list_to_string;
 use crate::molt_err;
 use crate::molt_ok;
-use crate::types::Exception;
 use crate::types::MoltDict;
 use crate::types::MoltList;
 use crate::types::MoltResult;
