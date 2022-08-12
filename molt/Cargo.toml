@@ -1,12 +1,11 @@
 [package]
-name = "molt"
+name = "molt-ng"
 version = "0.3.2"
-authors = ["Will Duquette <will@wjduquette.com>"]
+authors = ["Will Duquette <will@wjduquette.com>", "Zizheng Guo <gzz_2000@126.com>"]
 edition = "2018"
-description = "Embeddable TCL interpreter for Rust applications"
+description = "Embeddable TCL interpreter for Rust applications ()"
 license = "BSD-3-Clause"
-repository = "https://github.com/wduquette/molt"
-homepage = "https://wduquette.github.io/"
+repository = "https://bitbucket.org/zzdeps/molt-ng"
 readme = "README.md"
 keywords = ["language", "script", "scripting", "tcl"]
 

@@ -470,6 +470,24 @@ impl Value {
         slot.as_ref().expect("string rep")
     }
 
+    /// Returns the value's string representation if it is already ready.
+    /// This is useful for implementing command line switches.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use molt::types::Value;
+    /// let value = Value::from(123);
+    /// assert_eq!(value.try_as_str(), None);
+    /// assert_eq!(value.as_str(), "123");
+    /// assert_eq!(value.try_as_str(), Some("123"));
+    /// let value_str = Value::from("123");
+    /// assert_eq!(value_str.try_as_str(), Some("123"));
+    /// ```
+    pub fn try_as_str(&self) -> Option<&str> {
+        unsafe { &*self.inner.string_rep.get() }.as_ref().map(|x| x.as_ref())
+    }
+
     /// Tries to return the `Value` as a `bool`, parsing the
     /// value's string representation if necessary.
     ///
