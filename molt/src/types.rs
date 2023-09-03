@@ -713,8 +713,8 @@ pub struct ContextID(pub(crate) u64);
 /// A function used to implement a binary Molt command. For more information see the
 /// discussion of command definition in [The Molt Book] and the [`interp`] module.
 ///
-/// The command may retrieve its application context from the [`interp`]'s context cache
-/// if it was defined with a [`ContextID`].
+/// The command may retrieve its application contexts (can be multiple) from the [`interp`]'s context cache
+/// if it was defined with a slice of [`ContextID`]s.
 ///
 /// The command function receives the interpreter, the context ID, and a slice
 /// representing the command and its arguments.
@@ -722,7 +722,7 @@ pub struct ContextID(pub(crate) u64);
 /// [The Molt Book]: https://wduquette.github.io/molt/
 /// [`interp`]: ../interp/index.html
 /// [`ContextID`]: struct.ContextID.html
-pub type CommandFunc = fn(&mut Interp, ContextID, &[Value]) -> MoltResult;
+pub type CommandFunc = fn(&mut Interp, &[ContextID], &[Value]) -> MoltResult;
 
 /// A Molt command that has subcommands is called an _ensemble_ command.  In Rust code,
 /// the ensemble is defined as an array of `Subcommand` structs, each one mapping from

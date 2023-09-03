@@ -556,7 +556,7 @@ impl Tokens {
 ///
 /// A command for parsing an arbitrary script and outputting the parsed form.
 /// This is an undocumented debugging aid.  The output can be greatly improved.
-pub fn cmd_parse(_interp: &mut Interp, _: ContextID, argv: &[Value]) -> MoltResult {
+pub fn cmd_parse(_interp: &mut Interp, _: &[ContextID], argv: &[Value]) -> MoltResult {
     check_args(1, argv, 2, 2, "script")?;
 
     let script = &argv[1];

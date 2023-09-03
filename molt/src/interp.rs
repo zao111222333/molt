@@ -162,7 +162,7 @@
 //! # }
 //!
 //! // The command: square intValue
-//! fn cmd_square(_: &mut Interp, _: ContextID, argv: &[Value]) -> MoltResult {
+//! fn cmd_square(_: &mut Interp, _: &[ContextID], argv: &[Value]) -> MoltResult {
 //!     // FIRST, check the number of arguments.  Returns an appropriate error
 //!     // for the wrong number of arguments.
 //!     check_args(1, argv, 2, 2, "intValue")?;
@@ -228,7 +228,7 @@
 //! use molt_ng::molt_ok;
 //! use molt_ng::types::*;
 //!
-//! pub fn cmd_set(interp: &mut Interp, _: ContextID, argv: &[Value]) -> MoltResult {
+//! pub fn cmd_set(interp: &mut Interp, _: &[ContextID], argv: &[Value]) -> MoltResult {
 //!    check_args(1, argv, 2, 3, "varName ?newValue?")?;
 //!
 //!    if argv.len() == 3 {
@@ -288,8 +288,8 @@
 //!   * This struct may contain the data required by the command(s), or keys allowing it
 //!     to access the data elsewhere.
 //!
-//! * The `ContextID` is provided to the interpreter when adding commands that require that
-//!   context.
+//! * The `ContextID` (can be multiple, provided as a slice) is provided to the interpreter when adding commands that require that
+//!   context(s).
 //!
 //! * A command can mutably access its context data when it is executed.
 //!
@@ -330,7 +330,7 @@
 //! let context_id = interp.save_context(Stats::new());
 //!
 //! // Add the `test` command with the given context.
-//! interp.add_context_command("test", cmd_test, context_id);
+//! interp.add_context_command("test", cmd_test, &[context_id]);
 //!
 //! // Try using the new command.  It should increment the `num_passed` statistic.
 //! let val = interp.eval("test ...")?;
@@ -340,9 +340,9 @@
 //!
 //! // A stub test command.  It ignores its arguments, and
 //! // increments the `num_passed` statistic in its context.
-//! fn cmd_test(interp: &mut Interp, context_id: ContextID, argv: &[Value]) -> MoltResult {
+//! fn cmd_test(interp: &mut Interp, context_ids: &[ContextID], argv: &[Value]) -> MoltResult {
 //!     // Pretend it passed
-//!     interp.context::<Stats>(context_id).num_passed += 1;
+//!     interp.context::<Stats>(context_ids[0]).num_passed += 1;
 //!
 //!     molt_ok!()
 //! }
@@ -367,11 +367,11 @@
 //!     // ...
 //! ];
 //!
-//! pub fn cmd_array(interp: &mut Interp, context_id: ContextID, argv: &[Value]) -> MoltResult {
-//!     interp.call_subcommand(context_id, argv, 1, &ARRAY_SUBCOMMANDS)
+//! pub fn cmd_array(interp: &mut Interp, context_ids: &[ContextID], argv: &[Value]) -> MoltResult {
+//!     interp.call_subcommand(context_ids, argv, 1, &ARRAY_SUBCOMMANDS)
 //! }
 //!
-//! pub fn cmd_array_exists(interp: &mut Interp, _: ContextID, argv: &[Value]) -> MoltResult {
+//! pub fn cmd_array_exists(interp: &mut Interp, _: &[ContextID], argv: &[Value]) -> MoltResult {
 //!     check_args(2, argv, 3, 3, "arrayName")?;
 //!     molt_ok!(Value::from(interp.array_exists(argv[2].as_str())))
 //! }
@@ -381,7 +381,7 @@
 //!
 //! The `cmd_array` and `cmd_array_exists` functions are just normal Molt `CommandFunc`
 //! functions.  The `array` command is added to the interpreter using `Interp::add_command`
-//! in the usual way. Note that the `context_id` is passed to the subcommand functions, though
+//! in the usual way. Note that the `context_id`s are passed to the subcommand functions, though
 //! in this case it isn't needed.
 //!
 //! Also, notice that the call to `check_args` in `cmd_array_exists` has `2` as its first
@@ -518,7 +518,7 @@ pub struct Interp {
 /// A command defined in the interpreter.
 enum Command {
     /// A binary command implemented as a Rust CommandFunc.
-    Native(CommandFunc, ContextID),
+    Native(CommandFunc, Vec<ContextID>),
 
     /// A Molt procedure
     Proc(Procedure),
@@ -528,7 +528,7 @@ impl Command {
     /// Execute the command according to its kind.
     fn execute(&self, interp: &mut Interp, argv: &[Value]) -> MoltResult {
         match self {
-            Command::Native(func, context_id) => func(interp, *context_id, argv),
+            Command::Native(func, context_ids) => func(interp, context_ids, argv),
             Command::Proc(proc) => proc.execute(interp, argv),
         }
     }
@@ -541,11 +541,11 @@ impl Command {
         }
     }
 
-    /// Gets the command's context, or NULL_CONTEXT if none.
-    fn context_id(&self) -> ContextID {
+    /// Gets the command's context, or empty slice if none.
+    fn context_ids(&self) -> &[ContextID] {
         match self {
-            Command::Native(_, context_id) => *context_id,
-            _ => NULL_CONTEXT,
+            Command::Native(_, context_ids) => context_ids,
+            _ => &[],
         }
     }
 
@@ -558,17 +558,6 @@ impl Command {
         }
     }
 }
-
-/// Sentinal value for command functions with no related context.
-///
-/// **NOTE**: it would make no sense to use `Option<ContextID>` instead of a sentinal
-/// value.  Whether or not a command has related context is known at compile
-/// time, and is an essential part of the command's definition; it never changes.
-/// Commands with context will access the function's context_id argument; and
-/// and commands without have no reason to do so.  Using a sentinel allows the same
-/// function type to be used for all binary Molt commands with minimal hassle to the
-/// client developer.
-const NULL_CONTEXT: ContextID = ContextID(0);
 
 /// A container for a command's context struct, containing the context in a box,
 /// and a reference count.
@@ -1725,23 +1714,23 @@ impl Interp {
     /// use [`add_context_command`](#method.add_context_command) instead.  See the
     /// [module level documentation](index.html) for an overview and examples.
     pub fn add_command(&mut self, name: &str, func: CommandFunc) {
-        self.add_context_command(name, func, NULL_CONTEXT);
+        self.add_context_command(name, func, &[]);
     }
 
     /// Adds a binary command with related context data to the interpreter.
     ///
     /// This is the normal way to add commands requiring application context.  See the
     /// [module level documentation](index.html) for an overview and examples.
-    pub fn add_context_command(&mut self, name: &str, func: CommandFunc, context_id: ContextID) {
-        if context_id != NULL_CONTEXT {
+    pub fn add_context_command(&mut self, name: &str, func: CommandFunc, context_ids: &[ContextID]) {
+        for context_id in context_ids {
             self.context_map
-                .get_mut(&context_id)
+                .get_mut(context_id)
                 .expect("unknown context ID")
                 .increment();
         }
 
         self.commands
-            .insert(name.into(), Rc::new(Command::Native(func, context_id)));
+            .insert(name.into(), Rc::new(Command::Native(func, context_ids.iter().copied().collect())));
     }
 
     /// Adds a procedure to the interpreter.
@@ -1818,22 +1807,23 @@ impl Interp {
     /// ```
     pub fn remove_command(&mut self, name: &str) {
         // FIRST, get the command's context ID, if any.
-        let context_id = self
+        let context_ids = self
             .commands
             .get(name)
             .expect("undefined command")
-            .context_id();
+            .context_ids();
 
-        // NEXT, If it has a context ID, decrement its reference count; and if the reference
+        // NEXT, If it has a non-empty context ID slice, decrement their references count; and if the reference
         // is zero, remove the context.
-        if context_id != NULL_CONTEXT
-            && self
+        for context_id in context_ids {
+            if self
                 .context_map
-                .get_mut(&context_id)
+                .get_mut(context_id)
                 .expect("unknown context ID")
                 .decrement()
-        {
-            self.context_map.remove(&context_id);
+            {
+                self.context_map.remove(context_id);
+            }
         }
 
         // FINALLY, remove the command itself.
@@ -1962,7 +1952,7 @@ impl Interp {
     /// Calls a subcommand of the current command, looking up its name in an array of
     /// `Subcommand` tuples.
     ///
-    /// The subcommand, if found, is called with the same `context_id` and `argv` as its
+    /// The subcommand, if found, is called with the same `context_ids` and `argv` as its
     /// parent ensemble.  `subc` is the index of the subcommand's name in the `argv` array;
     /// in most cases it will be `1`, but it is possible to define subcommands with
     /// subcommands of their own.  The `subcommands` argument is a borrow of an array of
@@ -1976,14 +1966,14 @@ impl Interp {
     /// [module level documentation](index.html) for examples.
     pub fn call_subcommand(
         &mut self,
-        context_id: ContextID,
+        context_ids: &[ContextID],
         argv: &[Value],
         subc: usize,
         subcommands: &[Subcommand],
     ) -> MoltResult {
         check_args(subc, argv, subc + 1, 0, "subcommand ?arg ...?")?;
         let rec = Subcommand::find(subcommands, argv[subc].as_str())?;
-        (rec.1)(self, context_id, argv)
+        (rec.1)(self, context_ids, argv)
     }
 
     //--------------------------------------------------------------------------------------------
@@ -2525,7 +2515,7 @@ mod tests {
         let id = interp.save_context(String::from("ABC"));
 
         // Use it with a command.
-        interp.add_context_command("dummy", dummy_cmd, id);
+        interp.add_context_command("dummy", dummy_cmd, &[id]);
 
         // Remove the command.
         interp.remove_command("dummy");
@@ -2543,8 +2533,8 @@ mod tests {
         let id = interp.save_context(String::from("ABC"));
 
         // Use it with a command.
-        interp.add_context_command("dummy", dummy_cmd, id);
-        interp.add_context_command("dummy2", dummy_cmd, id);
+        interp.add_context_command("dummy", dummy_cmd, &[id]);
+        interp.add_context_command("dummy2", dummy_cmd, &[id]);
 
         // Remove the command.
         interp.remove_command("dummy");
@@ -2555,7 +2545,7 @@ mod tests {
         let _ctx = interp.context::<String>(id);
     }
 
-    fn dummy_cmd(_: &mut Interp, _: ContextID, _: &[Value]) -> MoltResult {
+    fn dummy_cmd(_: &mut Interp, _: &[ContextID], _: &[Value]) -> MoltResult {
         molt_err!("Not really meant to be called")
     }
 }

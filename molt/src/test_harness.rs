@@ -82,7 +82,7 @@ pub fn test_harness(interp: &mut Interp, args: &[String]) -> Result<(), ()> {
     let context_id = interp.save_context(TestContext::new());
 
     // NEXT, install the test commands into the interpreter.
-    interp.add_context_command("test", test_cmd, context_id);
+    interp.add_context_command("test", test_cmd, &[context_id]);
 
     // NEXT, execute the script.
     match fs::read_to_string(&args[0]) {
@@ -217,21 +217,21 @@ impl TestInfo {
 /// point I'll need something much more robust.
 ///
 /// Note: See the Molt Book for the full syntax.
-fn test_cmd(interp: &mut Interp, context_id: ContextID, argv: &[Value]) -> MoltResult {
+fn test_cmd(interp: &mut Interp, context_ids: &[ContextID], argv: &[Value]) -> MoltResult {
     // FIRST, check the minimum command line.
     check_args(1, argv, 4, 0, "name description args...")?;
 
     // NEXT, see which kind of command it is.
     let arg = argv[3].as_str();
     if arg.starts_with('-') {
-        fancy_test(interp, context_id, argv)
+        fancy_test(interp, context_ids, argv)
     } else {
-        simple_test(interp, context_id, argv)
+        simple_test(interp, context_ids, argv)
     }
 }
 
 // The simple version of the test command.
-fn simple_test(interp: &mut Interp, context_id: ContextID, argv: &[Value]) -> MoltResult {
+fn simple_test(interp: &mut Interp, context_ids: &[ContextID], argv: &[Value]) -> MoltResult {
     check_args(1, argv, 6, 6, "name description script -ok|-error result")?;
 
     // FIRST, get the test info
@@ -246,19 +246,19 @@ fn simple_test(interp: &mut Interp, context_id: ContextID, argv: &[Value]) -> Mo
     } else if code == "-error" {
         Code::Error
     } else {
-        incr_errors(interp, context_id);
+        incr_errors(interp, context_ids);
         info.print_helper_error("test command", &format!("invalid option: \"{}\"", code));
 
         return molt_ok!();
     };
 
     // NEXT, run the test.
-    run_test(interp, context_id, &info);
+    run_test(interp, context_ids, &info);
     molt_ok!()
 }
 
 // The fancier, more flexible version of the test.
-fn fancy_test(interp: &mut Interp, context_id: ContextID, argv: &[Value]) -> MoltResult {
+fn fancy_test(interp: &mut Interp, context_ids: &[ContextID], argv: &[Value]) -> MoltResult {
     check_args(
         1,
         argv,
@@ -279,7 +279,7 @@ fn fancy_test(interp: &mut Interp, context_id: ContextID, argv: &[Value]) -> Mol
 
         let val = iter.next();
         if val.is_none() {
-            incr_errors(interp, context_id);
+            incr_errors(interp, context_ids);
             info.print_helper_error("test command", &format!("missing value for {}", opt));
             return molt_ok!();
         }
@@ -298,7 +298,7 @@ fn fancy_test(interp: &mut Interp, context_id: ContextID, argv: &[Value]) -> Mol
                 info.expect = val.to_string();
             }
             _ => {
-                incr_errors(interp, context_id);
+                incr_errors(interp, context_ids);
                 info.print_helper_error("test command", &format!("invalid option: \"{}\"", val));
                 return molt_ok!();
             }
@@ -306,12 +306,12 @@ fn fancy_test(interp: &mut Interp, context_id: ContextID, argv: &[Value]) -> Mol
     }
 
     // NEXT, run the test.
-    run_test(interp, context_id, &info);
+    run_test(interp, context_ids, &info);
     molt_ok!()
 }
 
 // Run the actual test and save the result.
-fn run_test(interp: &mut Interp, context_id: ContextID, info: &TestInfo) {
+fn run_test(interp: &mut Interp, context_ids: &[ContextID], info: &TestInfo) {
     // FIRST, push a variable scope; -setup, -body, and -cleanup will share it.
     interp.push_scope();
 
@@ -345,7 +345,7 @@ fn run_test(interp: &mut Interp, context_id: ContextID, info: &TestInfo) {
     interp.pop_scope();
 
     // NEXT, get the context and save the results.
-    let ctx = interp.context::<TestContext>(context_id);
+    let ctx = interp.context::<TestContext>(context_ids[0]);
     ctx.num_tests += 1;
 
     match &result {
@@ -377,6 +377,6 @@ fn run_test(interp: &mut Interp, context_id: ContextID, info: &TestInfo) {
 }
 
 // Increment the failure counter.
-fn incr_errors(interp: &mut Interp, context_id: ContextID) {
-    interp.context::<TestContext>(context_id).num_errors += 1;
+fn incr_errors(interp: &mut Interp, context_ids: &[ContextID]) {
+    interp.context::<TestContext>(context_ids[0]).num_errors += 1;
 }
