@@ -3,7 +3,7 @@
 //! This crate provides the code for adding the Molt REPL and related tools to a binary
 //! crate.
 //!
-//! In each case, begin by creating a `molt::Interp` and adding any application-specific
+//! In each case, begin by creating a `molt_ng::Interp` and adding any application-specific
 //! extensions.  Then:
 //!
 //! * To invoke the REPL, use [`molt_shell::repl`](./fn.repl.html).

@@ -1,6 +1,6 @@
-use molt::Interp;
-use molt::MoltList;
-use molt::Value;
+use molt_ng::Interp;
+use molt_ng::MoltList;
+use molt_ng::Value;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::fs;
@@ -15,13 +15,13 @@ use std::fs;
 /// To change the prompt, set the `tcl_prompt1` TCL variable to a script that returns
 /// the desired prompt.
 ///
-/// See [`molt::interp`](../molt/interp/index.html) for details on how to configure and
+/// See [`molt_ng::interp`](../molt/interp/index.html) for details on how to configure and
 /// add commands to a Molt interpreter.
 ///
 /// # Example
 ///
 /// ```
-/// use molt::Interp;
+/// use molt_ng::Interp;
 ///
 /// // FIRST, create and initialize the interpreter.
 /// let mut interp = Interp::new();
@@ -29,7 +29,7 @@ use std::fs;
 /// // NOTE: commands can be added to the interpreter here.
 ///
 /// // NEXT, invoke the REPL.
-/// molt_shell::repl(&mut interp);
+/// molt_ng_shell::repl(&mut interp);
 /// ```
 pub fn repl(interp: &mut Interp) {
     let mut rl = Editor::<()>::new();
@@ -94,13 +94,13 @@ pub fn repl(interp: &mut Interp) {
 /// * The Molt variable `argv` will be set to a Molt list containing the remainder of the
 ///   `argv` array.
 ///
-/// See [`molt::interp`](../molt/interp/index.html) for details on how to configure and
+/// See [`molt_ng::interp`](../molt/interp/index.html) for details on how to configure and
 /// add commands to a Molt interpreter.
 ///
 /// # Example
 ///
 /// ```
-/// use molt::Interp;
+/// use molt_ng::Interp;
 /// use std::env;
 ///
 /// // FIRST, get the command line arguments.
@@ -113,7 +113,7 @@ pub fn repl(interp: &mut Interp) {
 ///
 /// // NEXT, evaluate the file, if any.
 /// if args.len() > 1 {
-///     molt_shell::script(&mut interp, &args[1..]);
+///     molt_ng_shell::script(&mut interp, &args[1..]);
 /// } else {
 ///     eprintln!("Usage: myshell *filename.tcl");
 /// }

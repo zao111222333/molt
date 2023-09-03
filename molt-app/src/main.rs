@@ -1,4 +1,4 @@
-use molt::Interp;
+use molt_ng::Interp;
 use std::env;
 
 fn main() {
@@ -16,18 +16,18 @@ fn main() {
 
         match subcmd {
             "bench" => {
-                molt_shell::benchmark(&mut interp, &args[2..]);
+                molt_ng_shell::benchmark(&mut interp, &args[2..]);
             }
             "shell" => {
                 if args.len() == 2 {
                     println!("Molt {}", env!("CARGO_PKG_VERSION"));
-                    molt_shell::repl(&mut interp);
+                    molt_ng_shell::repl(&mut interp);
                 } else {
-                    molt_shell::script(&mut interp, &args[2..]);
+                    molt_ng_shell::script(&mut interp, &args[2..]);
                 }
             }
             "test" => {
-                if molt::test_harness(&mut interp, &args[2..]).is_ok() {
+                if molt_ng::test_harness(&mut interp, &args[2..]).is_ok() {
                     std::process::exit(0);
                 } else {
                     std::process::exit(1);

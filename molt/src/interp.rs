@@ -35,7 +35,7 @@
 //! empty interpreter.
 //!
 //! ```
-//! use molt::Interp;
+//! use molt_ng::Interp;
 //! let mut interp = Interp::new();
 //!
 //! // add commands, evaluate scripts, etc.
@@ -53,9 +53,9 @@
 //! For example, the following snippet uses the Molt `expr` command to evaluate an expression.
 //!
 //! ```
-//! use molt::Interp;
-//! use molt::molt_ok;
-//! use molt::types::*;
+//! use molt_ng::Interp;
+//! use molt_ng::molt_ok;
+//! use molt_ng::types::*;
 //!
 //! let _ = my_func();
 //!
@@ -107,9 +107,9 @@
 //! as in the `if` or `while` commands:
 //!
 //! ```
-//! use molt::Interp;
-//! use molt::molt_ok;
-//! use molt::types::*;
+//! use molt_ng::Interp;
+//! use molt_ng::molt_ok;
+//! use molt_ng::types::*;
 //!
 //! # let _ = dummy();
 //! # fn dummy() -> MoltResult {
@@ -144,10 +144,10 @@
 //! The following example defines a command called `square` that squares an integer value.
 //!
 //! ```
-//! use molt::Interp;
-//! use molt::check_args;
-//! use molt::molt_ok;
-//! use molt::types::*;
+//! use molt_ng::Interp;
+//! use molt_ng::check_args;
+//! use molt_ng::molt_ok;
+//! use molt_ng::types::*;
 //!
 //! # let _ = dummy();
 //! # fn dummy() -> MoltResult {
@@ -223,10 +223,10 @@
 //! for example, returns the assigned or retrieved value; it is defined like this:
 //!
 //! ```
-//! use molt::Interp;
-//! use molt::check_args;
-//! use molt::molt_ok;
-//! use molt::types::*;
+//! use molt_ng::Interp;
+//! use molt_ng::check_args;
+//! use molt_ng::molt_ok;
+//! use molt_ng::types::*;
 //!
 //! pub fn cmd_set(interp: &mut Interp, _: ContextID, argv: &[Value]) -> MoltResult {
 //!    check_args(1, argv, 2, 3, "varName ?newValue?")?;
@@ -302,10 +302,10 @@
 //! number of failures, etc.  This can be implemented as follows:
 //!
 //! ```
-//! use molt::Interp;
-//! use molt::check_args;
-//! use molt::molt_ok;
-//! use molt::types::*;
+//! use molt_ng::Interp;
+//! use molt_ng::check_args;
+//! use molt_ng::molt_ok;
+//! use molt_ng::types::*;
 //!
 //! // The context structure to hold the stats
 //! struct Stats {
@@ -481,9 +481,9 @@ const ZERO: &str = "0";
 /// Molt commands.
 ///
 /// ```
-/// use molt::types::*;
-/// use molt::Interp;
-/// use molt::molt_ok;
+/// use molt_ng::types::*;
+/// use molt_ng::Interp;
+/// use molt_ng::molt_ok;
 /// # fn dummy() -> MoltResult {
 /// let mut interp = Interp::new();
 /// let four = interp.eval("expr {2 + 2}")?;
@@ -633,7 +633,7 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// # use molt::interp::Interp;
+    /// # use molt_ng::interp::Interp;
     /// let mut interp = Interp::empty();
     /// assert!(interp.command_names().is_empty());
     /// ```
@@ -662,9 +662,9 @@ impl Interp {
     /// add or remove them in groups).
     ///
     /// ```
-    /// # use molt::types::*;
-    /// # use molt::Interp;
-    /// # use molt::molt_ok;
+    /// # use molt_ng::types::*;
+    /// # use molt_ng::Interp;
+    /// # use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// let mut interp = Interp::new();
     /// let four = interp.eval("expr {2 + 2}")?;
@@ -763,8 +763,8 @@ impl Interp {
     /// it's a computed `Value` or an error message (which is also a `Value`).
     ///
     /// ```
-    /// # use molt::types::*;
-    /// # use molt::Interp;
+    /// # use molt_ng::types::*;
+    /// # use molt_ng::Interp;
     ///
     /// let mut interp = Interp::new();
     ///
@@ -1025,8 +1025,8 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// # use molt::types::*;
-    /// # use molt::interp::Interp;
+    /// # use molt_ng::types::*;
+    /// # use molt_ng::interp::Interp;
     /// let mut interp = Interp::new();
     /// assert!(interp.complete("set a [expr {1+1}]"));
     /// assert!(!interp.complete("set a [expr {1+1"));
@@ -1042,8 +1042,8 @@ impl Interp {
     ///
     /// # Example
     /// ```
-    /// use molt::Interp;
-    /// use molt::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::types::*;
     /// # fn dummy() -> Result<String,Exception> {
     /// let mut interp = Interp::new();
     /// let expr = Value::from("2 + 2");
@@ -1070,8 +1070,8 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::Interp;
-    /// use molt::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::types::*;
     /// # fn dummy() -> Result<String,Exception> {
     /// let mut interp = Interp::new();
     ///
@@ -1093,8 +1093,8 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::Interp;
-    /// use molt::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::types::*;
     /// # fn dummy() -> Result<String,Exception> {
     /// let mut interp = Interp::new();
     ///
@@ -1116,8 +1116,8 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::Interp;
-    /// use molt::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::types::*;
     /// # fn dummy() -> Result<String,Exception> {
     /// let mut interp = Interp::new();
     ///
@@ -1145,9 +1145,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::Interp;
-    /// use molt::molt_ok;
+    /// use molt_ng::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// let mut interp = Interp::new();
     ///
@@ -1194,9 +1194,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::Interp;
-    /// use molt::molt_ok;
+    /// use molt_ng::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// let mut interp = Interp::new();
     ///
@@ -1232,9 +1232,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::Interp;
-    /// use molt::molt_ok;
+    /// use molt_ng::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// let mut interp = Interp::new();
     ///
@@ -1264,9 +1264,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::Interp;
-    /// use molt::molt_ok;
+    /// use molt_ng::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// let mut interp = Interp::new();
     ///
@@ -1291,9 +1291,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::Interp;
-    /// use molt::molt_ok;
+    /// use molt_ng::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// let mut interp = Interp::new();
     ///
@@ -1315,9 +1315,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::Interp;
-    /// use molt::molt_ok;
+    /// use molt_ng::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// let mut interp = Interp::new();
     ///
@@ -1339,9 +1339,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::Interp;
-    /// use molt::molt_ok;
+    /// use molt_ng::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// let mut interp = Interp::new();
     ///
@@ -1366,9 +1366,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::Interp;
-    /// use molt::molt_ok;
+    /// use molt_ng::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// let mut interp = Interp::new();
     ///
@@ -1390,9 +1390,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::Interp;
-    /// use molt::molt_ok;
+    /// use molt_ng::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// let mut interp = Interp::new();
     ///
@@ -1416,9 +1416,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::Interp;
-    /// use molt::molt_ok;
+    /// use molt_ng::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// let mut interp = Interp::new();
     ///
@@ -1441,9 +1441,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::Interp;
-    /// use molt::molt_ok;
+    /// use molt_ng::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// let mut interp = Interp::new();
     ///
@@ -1474,9 +1474,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::Interp;
-    /// use molt::molt_ok;
+    /// use molt_ng::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// let mut interp = Interp::new();
     ///
@@ -1496,8 +1496,8 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::Interp;
-    /// use molt::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::types::*;
     ///
     /// # let mut interp = Interp::new();
     /// for name in interp.vars_in_scope() {
@@ -1514,8 +1514,8 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::Interp;
-    /// use molt::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::types::*;
     ///
     /// # let mut interp = Interp::new();
     /// for name in interp.vars_in_global_scope() {
@@ -1534,8 +1534,8 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::Interp;
-    /// use molt::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::types::*;
     ///
     /// # let mut interp = Interp::new();
     /// for name in interp.vars_in_local_scope() {
@@ -1600,9 +1600,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// # use molt::Interp;
-    /// # use molt::types::*;
-    /// # use molt::molt_ok;
+    /// # use molt_ng::Interp;
+    /// # use molt_ng::types::*;
+    /// # use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// # let mut interp = Interp::new();
     /// interp.set_scalar("a", Value::from(1))?;
@@ -1623,8 +1623,8 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::Interp;
-    /// use molt::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::types::*;
     ///
     /// # let mut interp = Interp::new();
     /// for txt in interp.array_get("myArray") {
@@ -1653,9 +1653,9 @@ impl Interp {
     /// ```
     ///
     /// ```
-    /// use molt::Interp;
-    /// use molt::types::*;
-    /// # use molt::molt_ok;
+    /// use molt_ng::Interp;
+    /// use molt_ng::types::*;
+    /// # use molt_ng::molt_ok;
     ///
     /// # fn dummy() -> MoltResult {
     /// # let mut interp = Interp::new();
@@ -1679,8 +1679,8 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::Interp;
-    /// use molt::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::types::*;
     ///
     /// # let mut interp = Interp::new();
     /// for name in interp.array_names("myArray") {
@@ -1697,10 +1697,10 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::Interp;
-    /// use molt::types::*;
+    /// use molt_ng::Interp;
+    /// use molt_ng::types::*;
     ///
-    /// # use molt::molt_ok;
+    /// # use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// let mut interp = Interp::new();
     ///
@@ -1777,9 +1777,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::Interp;
-    /// use molt::types::*;
-    /// use molt::molt_ok;
+    /// use molt_ng::Interp;
+    /// use molt_ng::types::*;
+    /// use molt_ng::molt_ok;
     /// # fn dummy() -> MoltResult {
     /// let mut interp = Interp::new();
     ///
@@ -1806,9 +1806,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::Interp;
-    /// use molt::types::*;
-    /// use molt::molt_ok;
+    /// use molt_ng::Interp;
+    /// use molt_ng::types::*;
+    /// use molt_ng::molt_ok;
     ///
     /// let mut interp = Interp::new();
     ///
@@ -1845,9 +1845,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::Interp;
-    /// use molt::types::*;
-    /// use molt::molt_ok;
+    /// use molt_ng::Interp;
+    /// use molt_ng::types::*;
+    /// use molt_ng::molt_ok;
     ///
     /// let mut interp = Interp::new();
     ///
@@ -1881,9 +1881,9 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::Interp;
-    /// use molt::types::*;
-    /// use molt::molt_ok;
+    /// use molt_ng::Interp;
+    /// use molt_ng::types::*;
+    /// use molt_ng::molt_ok;
     ///
     /// let mut interp = Interp::new();
     ///
@@ -1996,8 +1996,8 @@ impl Interp {
     ///
     /// # Example
     /// ```
-    /// # use molt::types::*;
-    /// # use molt::interp::Interp;
+    /// # use molt_ng::types::*;
+    /// # use molt_ng::interp::Interp;
     /// let mut interp = Interp::new();
     /// assert_eq!(interp.recursion_limit(), 1000);
     /// ```
@@ -2013,8 +2013,8 @@ impl Interp {
     ///
     /// # Example
     /// ```
-    /// # use molt::types::*;
-    /// # use molt::interp::Interp;
+    /// # use molt_ng::types::*;
+    /// # use molt_ng::interp::Interp;
     /// let mut interp = Interp::new();
     /// interp.set_recursion_limit(100);
     /// assert_eq!(interp.recursion_limit(), 100);
@@ -2035,8 +2035,8 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::interp::Interp;
+    /// use molt_ng::types::*;
+    /// use molt_ng::interp::Interp;
     ///
     /// let mut interp = Interp::new();
     /// let data: Vec<String> = Vec::new();
@@ -2055,8 +2055,8 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::interp::Interp;
+    /// use molt_ng::types::*;
+    /// use molt_ng::interp::Interp;
     ///
     /// let mut interp = Interp::new();
     /// let data: Vec<String> = Vec::new();
@@ -2093,8 +2093,8 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::interp::Interp;
+    /// use molt_ng::types::*;
+    /// use molt_ng::interp::Interp;
     ///
     /// let mut interp = Interp::new();
     /// let id1 = interp.context_id();
@@ -2123,8 +2123,8 @@ impl Interp {
     /// # Example
     ///
     /// ```
-    /// use molt::types::*;
-    /// use molt::interp::Interp;
+    /// use molt_ng::types::*;
+    /// use molt_ng::interp::Interp;
     ///
     /// let mut interp = Interp::new();
     /// let id = interp.context_id();

@@ -2,8 +2,8 @@
 //!
 //! A Molt test script is a Molt script containing tests of Molt code.  Each
 //! test is a call of the Molt `test` command provided by the
-//! `molt::test_harness` module.  The tests are executed in the context of the
-//! the application's `molt::Interp` (and so can test application-specific commands).
+//! `molt_ng::test_harness` module.  The tests are executed in the context of the
+//! the application's `molt_ng::Interp` (and so can test application-specific commands).
 //!
 //! The test harness keeps track of the number of tests executed, and whether they
 //! passed, failed, or returned an unexpected error.
@@ -41,13 +41,13 @@ use std::path::PathBuf;
 /// to execute.  The remaining elements are meant to be test harness options,
 /// but are currently ignored.
 ///
-/// See [`molt::interp`](../molt/interp/index.html) for details on how to configure and
+/// See [`molt_ng::interp`](../molt/interp/index.html) for details on how to configure and
 /// add commands to a Molt interpreter.
 ///
 /// # Example
 ///
 /// ```
-/// use molt::Interp;
+/// use molt_ng::Interp;
 /// use std::env;
 ///
 /// // FIRST, get the command line arguments.
@@ -60,7 +60,7 @@ use std::path::PathBuf;
 ///
 /// // NEXT, evaluate the file, if any.
 /// if args.len() > 1 {
-///     molt::test_harness(&mut interp, &args[1..]);
+///     molt_ng::test_harness(&mut interp, &args[1..]);
 /// } else {
 ///     eprintln!("Usage: mytest *filename.tcl");
 /// }

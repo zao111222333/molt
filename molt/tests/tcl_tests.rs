@@ -1,5 +1,5 @@
-extern crate molt;
-use molt::Interp;
+extern crate molt_ng;
+use molt_ng::Interp;
 
 #[test]
 fn test_tcl_tests() {
@@ -11,5 +11,5 @@ fn test_tcl_tests() {
 
     let args = vec![String::from("tests/all.tcl")];
 
-    assert!(molt::test_harness(&mut interp, &args).is_ok());
+    assert!(molt_ng::test_harness(&mut interp, &args).is_ok());
 }

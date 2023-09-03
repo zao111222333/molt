@@ -2,7 +2,7 @@
 //!
 //! A Molt benchmark script is a Molt script containing benchmarks of Molt code.  Each
 //! benchmark is a call of the Molt `benchmark` command provided by the
-//! `molt_shell::bench` module.  The benchmarks are executed in the context of the
+//! `molt_ng_shell::bench` module.  The benchmarks are executed in the context of the
 //! the application's `molt::Interp` (and so can benchmark application-specific commands).
 //!
 //! The harness executes each benchmark many times and retains the average run-time
@@ -12,13 +12,13 @@
 //! See the Molt Book (or the Molt benchmark suite) for how to write
 //! benchmarks and examples of benchmark scripts.
 
-use molt::check_args;
-use molt::molt_ok;
-use molt::ContextID;
-use molt::Interp;
-use molt::MoltInt;
-use molt::MoltResult;
-use molt::Value;
+use molt_ng::check_args;
+use molt_ng::molt_ok;
+use molt_ng::ContextID;
+use molt_ng::Interp;
+use molt_ng::MoltInt;
+use molt_ng::MoltResult;
+use molt_ng::Value;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -31,13 +31,13 @@ use std::path::PathBuf;
 /// of options, see The Molt Book or execute this function with an empty argument
 /// list.
 ///
-/// See [`molt::interp`](../molt/interp/index.html) for details on how to configure and
+/// See [`molt_ng::interp`](../molt/interp/index.html) for details on how to configure and
 /// add commands to a Molt interpreter.
 ///
 /// # Example
 ///
 /// ```
-/// use molt::Interp;
+/// use molt_ng::Interp;
 /// use std::env;
 ///
 /// // FIRST, get the command line arguments.
@@ -50,7 +50,7 @@ use std::path::PathBuf;
 ///
 /// // NEXT, evaluate the file, if any.
 /// if args.len() > 1 {
-///     molt_shell::benchmark(&mut interp, &args[1..]);
+///     molt_ng_shell::benchmark(&mut interp, &args[1..]);
 /// } else {
 ///     eprintln!("Usage: mybench *filename.tcl");
 /// }
@@ -223,7 +223,7 @@ struct Measurement {
 ///
 /// Records a benchmark measurement.
 fn measure_cmd(interp: &mut Interp, context_id: ContextID, argv: &[Value]) -> MoltResult {
-    molt::check_args(1, argv, 4, 4, "name description nanos")?;
+    molt_ng::check_args(1, argv, 4, 4, "name description nanos")?;
 
     // FIRST, get the arguments
     let name = argv[1].to_string();

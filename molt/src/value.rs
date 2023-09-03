@@ -102,7 +102,7 @@
 //! a simple enum.
 //!
 //! ```
-//! use molt::types::*;
+//! use molt_ng::types::*;
 //! use std::fmt;
 //! use std::str::FromStr;
 //!
@@ -272,7 +272,7 @@ impl From<String> for Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
+    /// use molt_ng::types::Value;
     /// let string = String::from("My New String");
     /// let value = Value::from(string);
     /// assert_eq!(value.as_str(), "My New String");
@@ -288,7 +288,7 @@ impl From<&str> for Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
+    /// use molt_ng::types::Value;
     /// let value = Value::from("My String Slice");
     /// assert_eq!(value.as_str(), "My String Slice");
     /// ```
@@ -303,7 +303,7 @@ impl From<&String> for Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
+    /// use molt_ng::types::Value;
     /// let value = Value::from("My String Slice");
     /// assert_eq!(value.as_str(), "My String Slice");
     /// ```
@@ -319,7 +319,7 @@ impl From<bool> for Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
+    /// use molt_ng::types::Value;
     /// let value = Value::from(true);
     /// assert_eq!(value.as_str(), "1");
     ///
@@ -337,9 +337,9 @@ impl From<MoltDict> for Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
-    /// use molt::types::MoltDict;
-    /// use molt::dict::dict_new;
+    /// use molt_ng::types::Value;
+    /// use molt_ng::types::MoltDict;
+    /// use molt_ng::dict::dict_new;
     ///
     /// let mut dict: MoltDict = dict_new();
     /// dict.insert(Value::from("abc"), Value::from("123"));
@@ -357,7 +357,7 @@ impl From<MoltInt> for Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
+    /// use molt_ng::types::Value;
     ///
     /// let value = Value::from(123);
     /// assert_eq!(value.as_str(), "123");
@@ -382,7 +382,7 @@ impl From<MoltFloat> for Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
+    /// use molt_ng::types::Value;
     ///
     /// let value = Value::from(12.34);
     /// assert_eq!(value.as_str(), "12.34");
@@ -398,7 +398,7 @@ impl From<MoltList> for Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
+    /// use molt_ng::types::Value;
     ///
     /// let list = vec![Value::from(1234), Value::from("abc")];
     /// let value = Value::from(list);
@@ -415,7 +415,7 @@ impl From<&[Value]> for Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
+    /// use molt_ng::types::Value;
     ///
     /// let values = [Value::from(1234), Value::from("abc")];
     /// let value = Value::from(&values[..]);
@@ -445,7 +445,7 @@ impl Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
+    /// use molt_ng::types::Value;
     /// let value = Value::from(123);
     /// assert_eq!(value.as_str(), "123");
     /// ```
@@ -476,7 +476,7 @@ impl Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
+    /// use molt_ng::types::Value;
     /// let value = Value::from(123);
     /// assert_eq!(value.try_as_str(), None);
     /// assert_eq!(value.as_str(), "123");
@@ -504,8 +504,8 @@ impl Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
-    /// use molt::types::Exception;
+    /// use molt_ng::types::Value;
+    /// use molt_ng::types::Exception;
     /// # fn dummy() -> Result<bool,Exception> {
     /// // All of the following can be interpreted as booleans.
     /// let value = Value::from(true);
@@ -574,13 +574,13 @@ impl Value {
     ///
     /// Parsing is case-insensitive, and leading and trailing whitespace are ignored.
     ///
-    /// This method does not evaluate expressions; use `molt::expr` to evaluate boolean
+    /// This method does not evaluate expressions; use `molt_ng::expr` to evaluate boolean
     /// expressions.
     ///
     /// # Example
     ///
     /// ```
-    /// # use molt::types::*;
+    /// # use molt_ng::types::*;
     /// # fn dummy() -> Result<bool,Exception> {
     /// let arg = "yes";
     /// let flag = Value::get_bool(arg)?;
@@ -605,9 +605,9 @@ impl Value {
     ///
     /// ```
     /// use std::rc::Rc;
-    /// use molt::types::Value;
-    /// use molt::types::MoltDict;
-    /// use molt::types::Exception;
+    /// use molt_ng::types::Value;
+    /// use molt_ng::types::MoltDict;
+    /// use molt_ng::types::Exception;
     /// # fn dummy() -> Result<(),Exception> {
     ///
     /// let value = Value::from("abc 1234");
@@ -649,9 +649,9 @@ impl Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
-    /// use molt::types::MoltDict;
-    /// use molt::types::Exception;
+    /// use molt_ng::types::Value;
+    /// use molt_ng::types::MoltDict;
+    /// use molt_ng::types::Exception;
     /// # fn dummy() -> Result<String,Exception> {
     ///
     /// let value = Value::from("abc 1234");
@@ -678,9 +678,9 @@ impl Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
-    /// use molt::types::MoltInt;
-    /// use molt::types::Exception;
+    /// use molt_ng::types::Value;
+    /// use molt_ng::types::MoltInt;
+    /// use molt_ng::types::Exception;
     /// # fn dummy() -> Result<MoltInt,Exception> {
     ///
     /// let value = Value::from(123);
@@ -715,7 +715,7 @@ impl Value {
     /// # Example
     ///
     /// ```
-    /// # use molt::types::*;
+    /// # use molt_ng::types::*;
     /// # fn dummy() -> Result<MoltInt,Exception> {
     /// let arg = "1";
     /// let int = Value::get_int(arg)?;
@@ -756,9 +756,9 @@ impl Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
-    /// use molt::types::MoltFloat;
-    /// use molt::types::Exception;
+    /// use molt_ng::types::Value;
+    /// use molt_ng::types::MoltFloat;
+    /// use molt_ng::types::Exception;
     /// # fn dummy() -> Result<MoltFloat,Exception> {
     ///
     /// let value = Value::from(12.34);
@@ -793,7 +793,7 @@ impl Value {
     /// # Example
     ///
     /// ```
-    /// # use molt::types::*;
+    /// # use molt_ng::types::*;
     /// # fn dummy() -> Result<MoltFloat,Exception> {
     /// let arg = "1e2";
     /// let val = Value::get_float(arg)?;
@@ -833,9 +833,9 @@ impl Value {
     ///
     /// ```
     /// use std::rc::Rc;
-    /// use molt::types::Value;
-    /// use molt::types::MoltList;
-    /// use molt::types::Exception;
+    /// use molt_ng::types::Value;
+    /// use molt_ng::types::MoltList;
+    /// use molt_ng::types::Exception;
     /// # fn dummy() -> Result<String,Exception> {
     ///
     /// let value = Value::from("1234 abc");
@@ -871,9 +871,9 @@ impl Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::Value;
-    /// use molt::types::MoltList;
-    /// use molt::types::Exception;
+    /// use molt_ng::types::Value;
+    /// use molt_ng::types::MoltList;
+    /// use molt_ng::types::Exception;
     /// # fn dummy() -> Result<String,Exception> {
     ///
     /// let value = Value::from("1234 abc");
@@ -918,7 +918,7 @@ impl Value {
     /// # Example
     ///
     /// ```
-    /// use molt::types::{Value, VarName};
+    /// use molt_ng::types::{Value, VarName};
     ///
     /// let value = Value::from("my_var");
     /// let var_name = value.as_var_name();
