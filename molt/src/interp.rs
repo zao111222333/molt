@@ -491,8 +491,13 @@ const ZERO: &str = "0";
 /// # molt_ok!()
 /// # }
 /// ```
+///
+/// The `Interp` can be associated with a lifetime. If so, it is allowed
+/// to create contexts consisting of references and mutable references
+/// within that lifetime. Under the hood, the references are stored as
+/// raw pointers.
 #[derive(Default)]
-pub struct Interp {
+pub struct Interp<'i> {
     // Command Table
     commands: HashMap<String, Rc<Command>>,
 
@@ -503,7 +508,7 @@ pub struct Interp {
     last_context_id: u64,
 
     // Context Map
-    context_map: HashMap<ContextID, ContextBox>,
+    context_map: HashMap<ContextID, ContextBox<'i>>,
 
     // Defines the recursion limit for Interp::eval().
     recursion_limit: usize,
@@ -559,23 +564,51 @@ impl Command {
     }
 }
 
+/// An internal wrapper intended to contain a raw pointer.
+/// It is not associated with a lifetime in order to be stored in a
+/// `ContextBox` which uses `Any`.
+///
+/// This is better than storing a raw pointer directly in `Any`,
+/// because a user might store a raw pointer manually and retrive it
+/// as a mutable reference. We can't control the safety of user-provided
+/// raw pointers except if we obtained it from a good-shape
+/// mutable reference ourselves, and wrapped it inside this trust box.
+///
+/// Safety: should ONLY be created within `ContextBox` methods.
+struct WrappedPointer<T: 'static>(T);
+
 /// A container for a command's context struct, containing the context in a box,
 /// and a reference count.
 ///
 /// The reference count is incremented when the context's ID is used with a command,
 /// and decremented when the command is forgotten.  If the reference count is
 /// decremented to zero, the context is removed.
-struct ContextBox {
+struct ContextBox<'i> {
     data: Box<dyn Any>,
     ref_count: usize,
+    // Marks the lifetime 'i as used, to avoid [compiler complains](https://doc.rust-lang.org/std/marker/struct.PhantomData.html).
+    phantom: std::marker::PhantomData<&'i u8>,
 }
 
-impl ContextBox {
+impl<'i> ContextBox<'i> {
     /// Creates a new context box for the given data, and sets its reference count to 0.
     fn new<T: 'static>(data: T) -> Self {
         Self {
             data: Box::new(data),
             ref_count: 0,
+            phantom: Default::default()
+        }
+    }
+
+    /// Creates a new context box for the given mutable reference, and sets its reference count to 0.
+    ///
+    /// This is the only place where WrappedPointer is created.
+    /// It guarantees that the wrapped raw pointer is valid within 'i.
+    fn new_mut<T: 'static>(data_ref: &'i mut T) -> Self {
+        Self {
+            data: Box::new(WrappedPointer(data_ref as *mut T)),
+            ref_count: 0,
+            phantom: Default::default()
         }
     }
 
@@ -596,6 +629,18 @@ impl ContextBox {
         self.ref_count -= 1;
         self.ref_count == 0
     }
+
+    /// Get a mutable reference.
+    fn get_mut<'j, T: 'static>(&'j mut self) -> &'j mut T where 'i: 'j {
+        if let Some(ret_mut) = self.data.downcast_mut::<WrappedPointer<*mut T>>() {
+            // safety guaranteed 
+            return unsafe { &mut *ret_mut.0 }
+        }
+        if let Some(ret) = self.data.downcast_mut::<T>() {
+            return ret;
+        }
+        panic!("context type mismatch")
+    }
 }
 
 struct ProfileRecord {
@@ -611,7 +656,7 @@ impl ProfileRecord {
 
 // NOTE: The order of methods in the generated RustDoc depends on the order in this block.
 // Consequently, methods are ordered pedagogically.
-impl Interp {
+impl<'i> Interp<'i> {
     //--------------------------------------------------------------------------------------------
     // Constructors
 
@@ -2037,7 +2082,29 @@ impl Interp {
         self.context_map.insert(id, ContextBox::new(data));
         id
     }
-
+    
+    /// Saves the client's context mutable reference in the interpreter's context cache,
+    /// returning a generated context ID.  Client commands can retrieve the data
+    /// given the ID.
+    ///
+    /// See the [module level documentation](index.html) for an overview and examples.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use molt_ng::types::*;
+    /// use molt_ng::interp::Interp;
+    ///
+    /// let mut interp = Interp::new();
+    /// let mut data: Vec<String> = Vec::new();
+    /// let id = interp.save_context_mut(&mut data);
+    /// ```
+    pub fn save_context_mut<T: 'static>(&mut self, data_ref: &'i mut T) -> ContextID {
+        let id = self.context_id();
+        self.context_map.insert(id, ContextBox::new_mut(data_ref));
+        id
+    }
+    
     /// Retrieves mutable client context data given the context ID.
     ///
     /// See the [module level documentation](index.html) for an overview and examples.
@@ -2065,13 +2132,11 @@ impl Interp {
     ///
     /// This call panics if the context ID is unknown, or if the retrieved data
     /// has an unexpected type.
-    pub fn context<T: 'static>(&mut self, id: ContextID) -> &mut T {
+    pub fn context<'j, T: 'static>(&'j mut self, id: ContextID) -> &'j mut T where 'i: 'j {
         self.context_map
             .get_mut(&id)
             .expect("unknown context ID")
-            .data
-            .downcast_mut::<T>()
-            .expect("context type mismatch")
+            .get_mut()
     }
 
     /// Generates a unique context ID for command context data.
@@ -2123,6 +2188,33 @@ impl Interp {
     /// ```
     pub fn set_context<T: 'static>(&mut self, id: ContextID, data: T) {
         self.context_map.insert(id, ContextBox::new(data));
+    }
+
+    /// Saves a client context mutable reference in the interpreter for the given
+    /// context ID.  Client commands can retrieve the data given the context ID.
+    ///
+    /// Normally the client will use [`save_context_mut`](#method.save_context_mut) to
+    /// save the context data and generate the client ID in one operation, rather than
+    /// call this explicitly.
+    ///
+    /// TODO: This method allows the user to generate a context ID and
+    /// put data into the context cache as two separate steps; and to update the
+    /// the data in the context cache for a given ID.  I'm not at all sure that
+    /// either of those things is a good idea.  Waiting to see.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use molt_ng::types::*;
+    /// use molt_ng::interp::Interp;
+    ///
+    /// let mut interp = Interp::new();
+    /// let id = interp.context_id();
+    /// let mut data: Vec<String> = Vec::new();
+    /// interp.set_context_mut(id, &mut data);
+    /// ```
+    pub fn set_context_mut<T: 'static>(&mut self, id: ContextID, data_ref: &'i mut T) {
+        self.context_map.insert(id, ContextBox::new_mut(data_ref));
     }
 
     //--------------------------------------------------------------------------------------------
@@ -2472,6 +2564,20 @@ mod tests {
         // Save a context object.
         let id = interp.context_id();
         interp.set_context(id, String::from("ABC"));
+
+        // Retrieve it.
+        let ctx = interp.context::<String>(id);
+        assert_eq!(*ctx, "ABC");
+    }
+
+    #[test]
+    fn context_mut() {
+        let mut interp = Interp::new();
+        let mut s = String::from("ABC");
+
+        // Save a context object.
+        let id = interp.context_id();
+        interp.set_context_mut(id, &mut s);
 
         // Retrieve it.
         let ctx = interp.context::<String>(id);
