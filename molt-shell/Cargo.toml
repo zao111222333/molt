@@ -1,6 +1,6 @@
 [package]
 name = "molt-ng-shell"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Will Duquette <will@wjduquette.com>", "Zizheng Guo <gzz_2000@126.com>"]
 edition = "2018"
 description = "Molt Application Frameworks"
@@ -11,5 +11,5 @@ readme = "README.md"
 keywords = ["language", "script", "scripting", "tcl"]
 
 [dependencies]
-molt-ng = { version = "0.4.0", path = "../molt", registry = "zzdeps" }
+molt-ng = { version = "0.4.1", path = "../molt", registry = "zzdeps" }
 rustyline = "5.0.0"
