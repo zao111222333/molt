@@ -518,6 +518,9 @@ pub struct Interp<'i> {
 
     // Profile Map
     profile_map: HashMap<String, ProfileRecord>,
+
+    // Whether to continue execution in case of error.
+    continue_on_error: bool,
 }
 
 /// A command defined in the interpreter.
@@ -681,6 +684,7 @@ impl<'i> Interp<'i> {
             scopes: ScopeStack::new(),
             num_levels: 0,
             profile_map: HashMap::new(),
+            continue_on_error: false,
         };
 
         interp.set_scalar("errorInfo", Value::empty()).unwrap();
@@ -901,8 +905,14 @@ impl<'i> Interp<'i> {
 
     /// Evaluates a parsed Script, producing a normal MoltResult.
     /// Also used by expr.rs.
+    ///
+    /// When [`continue_on_error`](Interp::set_continue_on_error)
+    /// is set, the script will proceed even
+    /// if an error is encountered.
+    /// In this case, it will only return an error if the last command
+    /// emits one.
     pub(crate) fn eval_script(&mut self, script: &Script) -> MoltResult {
-        let mut result_value = Value::empty();
+        let mut result_value: MoltResult = Ok(Value::empty());
 
         for word_vec in script.commands() {
             let words = self.eval_word_vec(word_vec.words())?;
@@ -913,6 +923,13 @@ impl<'i> Interp<'i> {
 
             let name = words[0].as_str();
 
+            if let Err(e) = result_value {
+                // this intermediate error is going to be overwritten.
+                // (due to `continue_on_error` being set).
+                // we log it before heading over to next command.
+                clilog::error!(TCL_ERR, "{}", e.error_info());
+            }
+
             if let Some(cmd) = self.commands.get(name) {
                 // let start = Instant::now();
                 let cmd = Rc::clone(cmd);
@@ -920,7 +937,7 @@ impl<'i> Interp<'i> {
                 // self.profile_save(&format!("cmd.execute({})", name), start);
 
                 if let Ok(v) = result {
-                    result_value = v;
+                    result_value = Ok(v);
                 } else if let Err(mut exception) = result {
                     // TODO: I think this needs to be done up above.
                     // // Handle the return -code, -level protocol
@@ -935,33 +952,44 @@ impl<'i> Interp<'i> {
                             // within some other body (ignored).
                             if exception.is_new_error() {
                                 exception.add_error_info("    while executing");
+                                // TODO: Add command.  In standard TCL, this is the text of the command
+                                // before interpolation; at present, we don't have that info in a
+                                // convenient form.  For now, just convert the final words to a string.
+                                exception.add_error_info(&format!("\"{}\"", &list_to_string(&words)));
                             } else if cmd.is_proc() {
                                 exception.add_error_info("    invoked from within");
                                 exception.add_error_info(&format!(
                                     "    (procedure \"{}\" line TODO)",
                                     name
                                 ));
-                            } else {
-                                return Err(exception);
+                                // TODO: same as above.
+                                exception.add_error_info(&format!("\"{}\"", &list_to_string(&words)));
                             }
-
-                            // TODO: Add command.  In standard TCL, this is the text of the command
-                            // before interpolation; at present, we don't have that info in a
-                            // convenient form.  For now, just convert the final words to a string.
-                            exception.add_error_info(&format!("\"{}\"", &list_to_string(&words)));
-                            return Err(exception);
-                        }
-                        _ => return Err(exception),
+                        },
+                        // return, continue, break, and custom logic
+                        // always exit the script and
+                        // are not affected by the error flag.
+                        _ => return Err(exception)
+                    }
+                    if !self.continue_on_error {
+                        return Err(exception)
+                    } else {
+                        result_value = Err(exception);
                     }
                 } else {
                     unreachable!();
                 }
             } else {
-                return molt_err!("invalid command name \"{}\"", name);
+                let err = molt_err!("invalid command name \"{}\"", name);
+                if !self.continue_on_error {
+                    return err
+                } else {
+                    result_value = err;
+                }
             }
         }
 
-        Ok(result_value)
+        result_value
     }
 
     /// Evaluates a WordVec, producing a list of Values.  The expansion operator is handled
@@ -2247,6 +2275,36 @@ impl<'i> Interp<'i> {
                 println!("{} nanos {}, count={}", avg, name, rec.count);
             }
         }
+    }
+
+    //--------------------------------------------------------------------------------------------
+    // Error control
+
+    /// get the current continue on error setting. the default is false.
+    ///
+    /// # Example
+    /// ```
+    /// # use molt_ng::types::*;
+    /// # use molt_ng::interp::Interp;
+    /// let mut interp = Interp::new();
+    /// assert_eq!(interp.continue_on_error(), false);
+    /// ```
+    pub fn continue_on_error(&self) -> bool {
+        self.continue_on_error
+    }
+
+    /// set whether to continue anyway in case of error.
+    ///
+    /// # Example
+    /// ```
+    /// # use molt_ng::types::*;
+    /// # use molt_ng::interp::Interp;
+    /// let mut interp = Interp::new();
+    /// interp.set_continue_on_error(true);
+    /// assert_eq!(interp.continue_on_error(), true);
+    /// ```
+    pub fn set_continue_on_error(&mut self, c: bool) {
+        self.continue_on_error = c;
     }
 }
 

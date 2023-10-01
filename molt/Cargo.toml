@@ -9,4 +9,5 @@ readme = "README.md"
 keywords = ["language", "script", "scripting", "tcl"]
 
 [dependencies]
+clilog = { version = "0.2.4", registry = "zzdeps" }
 indexmap = "1.3.0"
