@@ -915,7 +915,22 @@ impl<'i> Interp<'i> {
         let mut result_value: MoltResult = Ok(Value::empty());
 
         for word_vec in script.commands() {
-            let words = self.eval_word_vec(word_vec.words())?;
+            let words = match self.eval_word_vec(word_vec.words()) {
+                Ok(words) => words,
+                Err(e) => {
+                    if e.code() == ResultCode::Error && self.continue_on_error {
+                        if let Err(e) = result_value {
+                            // this intermediate error is going to be overwritten.
+                            // (due to `continue_on_error` being set).
+                            // we log it before heading over to next command.
+                            clilog::error!(TCL_ERR, "{}", e.error_info());
+                        }
+                        result_value = Err(e);
+                        continue;
+                    }
+                    return Err(e)
+                }
+            };
 
             if words.is_empty() {
                 break;
