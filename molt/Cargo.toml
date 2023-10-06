@@ -1,6 +1,6 @@
 [package]
 name = "molt-ng"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["Will Duquette <will@wjduquette.com>", "Zizheng Guo <gzz_2000@126.com>"]
 edition = "2018"
 description = "Embeddable TCL interpreter for Rust applications ()"
