@@ -2,6 +2,7 @@ use gloo::timers::callback::Timeout;
 use log::debug;
 use molt_forked::prelude::*;
 use std::mem;
+use web_sys::HtmlTextAreaElement;
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 
@@ -12,6 +13,7 @@ pub struct App {
     input_div_ref: NodeRef,
     hist_div_ref: NodeRef,
     input: String,
+    input_tmp: String,
     tcl_interp: Interp<AppCtx>,
     hist: Vec<(String, Vec<Result<Value, Exception>>)>,
     current_hist_idx: Option<usize>,
@@ -41,6 +43,15 @@ pub fn cmd_square(interp: &mut Interp<AppCtx>, argv: &[Value]) -> MoltResult {
 }
 
 impl App {
+    fn input_div_cursor_to_end(&mut self) {
+        if let Some(textarea) = self.input_div_ref.cast::<HtmlTextAreaElement>() {
+            let length = self.input.chars().count() as u32;
+            Timeout::new(10, move || {
+                _ = textarea.set_selection_range(length, length);
+            })
+            .forget();
+        }
+    }
     fn execute(&mut self, cmd: String) {
         let out = self.tcl_interp.eval(&cmd);
         let mut outs = mem::take(&mut self.tcl_interp.std_buff);
@@ -71,6 +82,7 @@ impl Component for App {
             hist_div_ref: NodeRef::default(),
             input_div_ref: NodeRef::default(),
             input: String::new(),
+            input_tmp: String::new(),
             tcl_interp,
             hist: Vec::new(),
             current_hist_idx: None,
@@ -114,66 +126,56 @@ set a"
                         self.execute(cmd);
                     }
                     self.current_hist_idx = None;
+                    self.input_tmp.clear();
                     true
                 }
-                Key::ArrowUp => {
-                    if self.input.is_empty() || self.current_hist_idx.is_some() {
-                        match self.current_hist_idx.as_mut() {
-                            Some(i) => {
-                                if *i != 0 {
-                                    *i -= 1;
-                                    if let Some((hist_cmd, _)) = self.hist.get(*i) {
-                                        self.input = hist_cmd.clone();
-                                    }
-                                    true
-                                } else {
-                                    false
-                                }
-                            }
-                            None => {
-                                let i = self.hist.len() - 1;
-                                self.current_hist_idx = Some(i);
-                                if let Some((hist_cmd, _)) = self.hist.get(i) {
-                                    self.input = hist_cmd.clone();
-                                }
-                                true
-                            }
+                Key::ArrowUp => match self.current_hist_idx.as_mut() {
+                    Some(0) => false,
+                    Some(i) => {
+                        if *i == self.hist.len() {
+                            self.input_tmp = mem::take(&mut self.input);
                         }
-                    } else {
-                        false
-                    }
-                }
-                Key::ArrowDown => {
-                    if self.input.is_empty() || self.current_hist_idx.is_some() {
-                        match self.current_hist_idx.as_mut() {
-                            Some(i) => {
-                                if *i != self.hist.len() - 1 {
-                                    *i += 1;
-                                    if let Some((hist_cmd, _)) = self.hist.get(*i) {
-                                        self.input = hist_cmd.clone();
-                                    }
-                                    true
-                                } else {
-                                    false
-                                }
-                            }
-                            None => {
-                                let i = self.hist.len() - 1;
-                                self.current_hist_idx = Some(i);
-                                if let Some((hist_cmd, _)) = self.hist.get(i) {
-                                    self.input = hist_cmd.clone();
-                                }
-                                true
-                            }
+                        *i -= 1;
+                        if let Some((hist_cmd, _)) = self.hist.get(*i) {
+                            self.input = hist_cmd.clone();
                         }
-                    } else {
-                        false
+                        self.input_div_cursor_to_end();
+                        true
                     }
-                }
+                    None => {
+                        let i = self.hist.len() - 1;
+                        self.current_hist_idx = Some(i);
+                        if let Some((hist_cmd, _)) = self.hist.get(i) {
+                            self.input_tmp = mem::take(&mut self.input);
+                            self.input = hist_cmd.clone();
+                        }
+                        self.input_div_cursor_to_end();
+                        true
+                    }
+                },
+                Key::ArrowDown => match self.current_hist_idx.as_mut() {
+                    Some(i) => {
+                        if *i == self.hist.len() {
+                            false
+                        } else if *i == self.hist.len() - 1 {
+                            *i += 1;
+                            self.input = mem::take(&mut self.input_tmp);
+                            true
+                        } else {
+                            *i += 1;
+                            if let Some((hist_cmd, _)) = self.hist.get(*i) {
+                                self.input = hist_cmd.clone();
+                            }
+                            true
+                        }
+                    }
+                    None => false,
+                },
             },
             Msg::UpdateInput(s) => {
                 self.input = s;
                 self.current_hist_idx = None;
+                self.input_tmp.clear();
                 if self.input == "\n" {
                     self.input.clear();
                 }
@@ -182,6 +184,7 @@ set a"
             Msg::None => false,
         }
     }
+
     fn rendered(&mut self, _ctx: &Context<Self>, first_render: bool) {
         if first_render {
             // NOTICE: slip scroll animation
