@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>tcl terminal</title>
+    <link rel="stylesheet" href="./style-ff7eb470aafbaa28.css" integrity="sha384&#x2D;KJURP7faCuE0YGcUUdAL76CsJSrXZjRzWYG6TxwDNGk&#x2B;vvgrW48fEGR4Olh8AscD"/>
+
+<link rel="modulepreload" href="./molt-wasm-fdff38a71130f97.js" crossorigin=anonymous integrity="sha384-Y4C7xMhKDb8QgWtvIn8vCJ2GGs0vtUmLRrzBhNFfoFHWdQSs08pJkFdrr+Ra8OPp">
+<link rel="preload" href="./molt-wasm-fdff38a71130f97_bg.wasm" crossorigin=anonymous integrity="sha384-DqFp2EpoyY2FW1TPou/HL5jGdoBuAWp3WTkISgp/eoTvNJGcVapyp0JcxFxCTgHp" as="fetch" type="application/wasm"></head>
+
+<body>
+<script type="module">
+import init, * as bindings from './molt-wasm-fdff38a71130f97.js';
+const wasm = await init('./molt-wasm-fdff38a71130f97_bg.wasm');
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script></body>
+
+</html>
