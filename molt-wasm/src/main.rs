@@ -206,7 +206,8 @@ set a"
         html! {
           <>
           <div>
-          <code>{"The context number is "}</code><code style="color:red;">{self.tcl_interp.context.num}</code><code>{", run `square [number]` to change it"}</code>
+          <a href="https://github.com/zao111222333/molt-forked/tree/master/molt-wasm"><code>{"code"}</code><Icon icon_id={IconId::BootstrapGithub} height={"10px".to_owned()} width={"15px".to_owned()}/></a>
+          <code>{" The context number is "}</code><code style="color:red;">{self.tcl_interp.context.num}</code><code>{", run `square [number]` to change it"}</code>
           </div>
           <ul ref={self.hist_div_ref.clone()}
           style="text-wrap:nowrap;height:50vh;margin:0px; overflow-y: auto; padding:10px;padding-inline-start:5px;padding-inline-end:5px; background: #f0f0f0;overflow-y:auto;overflow-x:auto;">

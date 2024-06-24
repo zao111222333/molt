@@ -12,5 +12,6 @@ gloo = { version = "0.11", features = ["events"] }
 yew = { version = "0.21", features = ["csr"] }
 yew_icons = {version = "0.8", features = [
     "BootstrapCheckLg",
-    "FontAwesomeSolidXmark"
+    "BootstrapGithub",
+    "FontAwesomeSolidXmark",
 ]}
