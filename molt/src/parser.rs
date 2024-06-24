@@ -48,15 +48,12 @@
 //! the parser but by the command that interprets the argument as a variable name.  This module
 //! provides `parse_varname_literal` for this case; it is usually used via `Value::as_var_name`.
 
-use crate::check_args;
-use crate::eval_ptr::EvalPtr;
-use crate::interp::Interp;
-use crate::types::ContextID;
-use crate::types::Exception;
-use crate::types::MoltResult;
-use crate::types::VarName;
-use crate::util::is_varname_char;
-use crate::value::Value;
+use crate::{
+    eval_ptr::EvalPtr,
+    types::{Exception, VarName},
+    util::is_varname_char,
+    value::Value,
+};
 
 /// A compiled script, which can be executed in the context of an interpreter.
 #[derive(Debug, PartialEq)]
@@ -68,9 +65,7 @@ pub(crate) struct Script {
 impl Script {
     /// Create a new script object, to which commands will be added during parsing.
     fn new() -> Self {
-        Self {
-            commands: Vec::new(),
-        }
+        Self { commands: Vec::new() }
     }
 
     /// Return the list of commands for evaluation.
@@ -552,18 +547,6 @@ impl Tokens {
     }
 }
 
-/// # parse *script*
-///
-/// A command for parsing an arbitrary script and outputting the parsed form.
-/// This is an undocumented debugging aid.  The output can be greatly improved.
-pub fn cmd_parse(_interp: &mut Interp, _: &[ContextID], argv: &[Value]) -> MoltResult {
-    check_args(1, argv, 2, 2, "script")?;
-
-    let script = &argv[1];
-
-    molt_ok!(format!("{:?}", parse(script.as_str())?))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -656,40 +639,25 @@ mod tests {
         // those functions are doing; they have their own tests.
 
         // Normal Braced Word
-        assert_eq!(
-            pword("{abc}"),
-            Ok((Word::Value(Value::from("abc")), "".into()))
-        );
+        assert_eq!(pword("{abc}"), Ok((Word::Value(Value::from("abc")), "".into())));
 
         // {*} at end of input
         assert_eq!(pword("{*}"), Ok((Word::Value(Value::from("*")), "".into())));
 
         // {*} followed by white-space
-        assert_eq!(
-            pword("{*} "),
-            Ok((Word::Value(Value::from("*")), " ".into()))
-        );
+        assert_eq!(pword("{*} "), Ok((Word::Value(Value::from("*")), " ".into())));
 
         // {*} followed by word
         assert_eq!(
             pword("{*}abc "),
-            Ok((
-                Word::Expand(Box::new(Word::Value(Value::from("abc")))),
-                " ".into()
-            ))
+            Ok((Word::Expand(Box::new(Word::Value(Value::from("abc")))), " ".into()))
         );
 
         // Quoted Word
-        assert_eq!(
-            pword("\"abc\""),
-            Ok((Word::Value(Value::from("abc")), "".into()))
-        );
+        assert_eq!(pword("\"abc\""), Ok((Word::Value(Value::from("abc")), "".into())));
 
         // Bare word
-        assert_eq!(
-            pword("abc"),
-            Ok((Word::Value(Value::from("abc")), "".into()))
-        );
+        assert_eq!(pword("abc"), Ok((Word::Value(Value::from("abc")), "".into())));
     }
 
     fn pword(input: &str) -> Result<(Word, String), Exception> {
@@ -701,16 +669,10 @@ mod tests {
     #[test]
     fn test_parse_braced_word() {
         // Simple string
-        assert_eq!(
-            pbrace("{abc}"),
-            Ok((Word::Value(Value::from("abc")), "".into()))
-        );
+        assert_eq!(pbrace("{abc}"), Ok((Word::Value(Value::from("abc")), "".into())));
 
         // Simple string with following space
-        assert_eq!(
-            pbrace("{abc} "),
-            Ok((Word::Value(Value::from("abc")), " ".into()))
-        );
+        assert_eq!(pbrace("{abc} "), Ok((Word::Value(Value::from("abc")), " ".into())));
 
         // String with white space
         assert_eq!(
@@ -762,32 +724,20 @@ mod tests {
     #[test]
     fn test_parse_quoted_word() {
         // Simple string
-        assert_eq!(
-            pqw("\"abc\""),
-            Ok((Word::Value(Value::from("abc")), "".into()))
-        );
+        assert_eq!(pqw("\"abc\""), Ok((Word::Value(Value::from("abc")), "".into())));
 
         // Simple string with text following
-        assert_eq!(
-            pqw("\"abc\" "),
-            Ok((Word::Value(Value::from("abc")), " ".into()))
-        );
+        assert_eq!(pqw("\"abc\" "), Ok((Word::Value(Value::from("abc")), " ".into())));
 
         // Backslash substitution at beginning, middle, and end
-        assert_eq!(
-            pqw("\"\\x77-\" "),
-            Ok((Word::Value(Value::from("w-")), " ".into()))
-        );
+        assert_eq!(pqw("\"\\x77-\" "), Ok((Word::Value(Value::from("w-")), " ".into())));
 
         assert_eq!(
             pqw("\"-\\x77-\" "),
             Ok((Word::Value(Value::from("-w-")), " ".into()))
         );
 
-        assert_eq!(
-            pqw("\"-\\x77\" "),
-            Ok((Word::Value(Value::from("-w")), " ".into()))
-        );
+        assert_eq!(pqw("\"-\\x77\" "), Ok((Word::Value(Value::from("-w")), " ".into())));
 
         // Variable reference
         assert_eq!(
@@ -815,10 +765,7 @@ mod tests {
         );
 
         // Not actually a variable reference
-        assert_eq!(
-            pqw("\"a$.b\" "),
-            Ok((Word::Value(Value::from("a$.b")), " ".into()))
-        );
+        assert_eq!(pqw("\"a$.b\" "), Ok((Word::Value(Value::from("a$.b")), " ".into())));
 
         // Brackets
         assert_eq!(
@@ -837,10 +784,7 @@ mod tests {
         assert_eq!(pqw("\"abc"), molt_err!("missing \""));
 
         // Extra characters after close-quote
-        assert_eq!(
-            pqw("\"abc\"x "),
-            molt_err!("extra characters after close-quote")
-        );
+        assert_eq!(pqw("\"abc\"x "), molt_err!("extra characters after close-quote"));
     }
 
     fn pqw(input: &str) -> Result<(Word, String), Exception> {
@@ -852,10 +796,7 @@ mod tests {
     #[test]
     fn test_parse_bare_word() {
         // Simple string
-        assert_eq!(
-            pbare("abc", false),
-            Ok((Word::Value(Value::from("abc")), "".into()))
-        );
+        assert_eq!(pbare("abc", false), Ok((Word::Value(Value::from("abc")), "".into())));
 
         // Simple string with text following
         assert_eq!(
@@ -966,10 +907,7 @@ mod tests {
         assert_eq!(pvar("$abc"), Ok((Word::VarRef("abc".into()), "".into())));
         assert_eq!(pvar("$abc."), Ok((Word::VarRef("abc".into()), ".".into())));
         assert_eq!(pvar("$a.bc"), Ok((Word::VarRef("a".into()), ".bc".into())));
-        assert_eq!(
-            pvar("$a1_.bc"),
-            Ok((Word::VarRef("a1_".into()), ".bc".into()))
-        );
+        assert_eq!(pvar("$a1_.bc"), Ok((Word::VarRef("a1_".into()), ".bc".into())));
 
         // Array names
         assert_eq!(
@@ -982,10 +920,7 @@ mod tests {
 
         // Braced var names
         assert_eq!(pvar("${a}b"), Ok((Word::VarRef("a".into()), "b".into())));
-        assert_eq!(
-            pvar("${ab"),
-            molt_err!("missing close-brace for variable name")
-        );
+        assert_eq!(pvar("${ab"), molt_err!("missing close-brace for variable name"));
 
         // Braced var names with arrays
         assert_eq!(

@@ -1,3 +1,42 @@
+# Molt-forked
+
+[![Crates.io](https://img.shields.io/crates/v/molt-forked.svg)](https://crates.io/crates/molt-forked)
+
+This is a forked version of `molt`, a embeddable TCL interpreter for Rust applications. The original repository is no longer actively maintained, and this version aims to continue its development, fix bugs, and add new features.
+
+## New in Molt-forked 0.4.0
+
+* WASM runtime support, see demo at [here](https://zao111222333.github.io/molt-forked/demo/), the demo project is in `molt-wasm` and you can find that the size of compiled WASM binary is only ~600k.
+* Remove `ContextMap` and related attributes / function parameters in Interpreter. Now the definiton of Interpreter is `Interp<Ctx>` (with user-defined generic `Ctx`), we can access Interpreter's Context directly via `interp.context`.
+* The native commands now is static, we need to use `gen_command!` macro to init Command.
+  
+  The benefit is that `molt-fork` can use `match` block to implement token matching, rather than `HashMap`
+* New document ([The Molt Book](https://zao111222333.github.io/molt-forked), Code Description) is not unimplemented yet.
+
+### Benchmark Result
+
++ **Command**: `cd molt-app && cargo run --release bench ../benchmarks/basic.tcl`
+
++ **Platform**: Intel Xeon 6348 CPU
+
+| molt-forked `0.4.0` (time unit in Nanos) | molt `0.3.2` | Speedup (×) | Benchmark                        |
+| ---------------------------------------- | ------------ | ----------- | -------------------------------- |
+| 89                                       | 208          | 2.34        | ok-1.1 ok, no arguments          |
+| 90                                       | 207          | 2.3         | ok-1.2 ok, one argument          |
+| 97                                       | 219          | 2.26        | ok-1.3 ok, two arguments         |
+| 119                                      | 209          | 1.76        | ident-1.1 ident, simple argument |
+| 209                                      | 402          | 1.92        | incr-1.1 incr a                  |
+| 158                                      | 311          | 1.97        | set-1.1 set var value            |
+| 201                                      | 348          | 1.73        | list-1.1 list of six items       |
+
+
+
+---
+
+===================== Below is Origin Document =====================
+
+---
+
 # Molt: More Or Less Tcl
 
 **Molt 0.3.2** is a minimal implementation of the TCL language for embedding in Rust apps

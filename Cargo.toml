@@ -1,10 +1,23 @@
-[workspace]
+[workspace.package]
+version = "0.4.0"
+edition = "2021"
+license = "MIT"
+authors = ["Will Duquette <will@wjduquette.com>", "Zizheng Guo <gzz_2000@126.com>", "Junzhuo Zhou <zhou@junzhuo.site>"]
+description = "Embeddable TCL interpreter for Rust applications (personal forked)"
+repository = "https://github.com/zao111222333/molt-forked"
+readme = "README.md"
+keywords = ["language", "script", "scripting", "tcl"]
+documentation = "https://docs.rs/molt-forked"
 
+[workspace]
 members = [
     "molt",
     "molt-shell",
+    "molt-wasm",
     "molt-app",
 ]
+[workspace.dependencies]
+molt-forked = { path = "molt" }
 
 [profile.release]
 opt-level = 3

@@ -1,0 +1,8 @@
+# https://rust-lang.github.io/rustfmt
+use_small_heuristics = "Max"
+tab_spaces = 4
+max_width = 90
+chain_width = 70
+struct_lit_width = 50
+use_field_init_shorthand = true
+merge_derives = false

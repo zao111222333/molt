@@ -13,7 +13,7 @@
 /// # Examples
 ///
 /// ```
-/// use molt_ng::*;
+/// use molt::*;
 ///
 /// // Return the empty result
 /// fn func1() -> MoltResult {
@@ -65,7 +65,7 @@ macro_rules! molt_ok {
 /// # Examples
 ///
 /// ```
-/// use molt_ng::*;
+/// use molt::*;
 ///
 /// // Return a simple error message
 /// fn err1() -> MoltResult {
@@ -118,7 +118,7 @@ macro_rules! molt_err {
 /// # Examples
 ///
 /// ```
-/// use molt_ng::*;
+/// use molt::*;
 ///
 /// // Throw a simple error
 /// fn throw1() -> MoltResult {
@@ -158,56 +158,202 @@ macro_rules! molt_throw {
     )
 }
 
+#[macro_export]
+macro_rules! gen_command {
+  ($input:ty, [ $( ($native_name:tt, $native_func:expr) ),* ], [ $( ($embedded_name:tt, $embedded_func:expr) ),* ]) => {
+    Command::new(
+      {fn f(name: &str, interp: &mut Interp<$input>, argv: &[Value]) -> MoltResult {
+        match name {
+          // NOTICE: Default native commands
+          _APPEND => cmd_append(interp, argv),
+          _ARRAY => cmd_array(interp, argv),
+          _ASSERT_EQ => cmd_assert_eq(interp, argv),
+          _BREAK => cmd_break(interp, argv),
+          _CATCH => cmd_catch(interp, argv),
+          _CONTINUE => cmd_continue(interp, argv),
+          _DICT => cmd_dict(interp, argv),
+          _ERROR => cmd_error(interp, argv),
+          _EXPR => cmd_expr(interp, argv),
+          _FOR => cmd_for(interp, argv),
+          _FOREACH => cmd_foreach(interp, argv),
+          _GLOBAL => cmd_global(interp, argv),
+          _IF => cmd_if(interp, argv),
+          _INCR => cmd_incr(interp, argv),
+          _INFO => cmd_info(interp, argv),
+          _JOIN => cmd_join(interp, argv),
+          _LAPPEND => cmd_lappend(interp, argv),
+          _LINDEX => cmd_lindex(interp, argv),
+          _LIST => cmd_list(interp, argv),
+          _LLENGTH => cmd_llength(interp, argv),
+          _PROC => cmd_proc(interp, argv),
+          _PUTS => cmd_puts(interp, argv),
+          _RENAME => cmd_rename(interp, argv),
+          _RETURN => cmd_return(interp, argv),
+          _SET => cmd_set(interp, argv),
+          _STRING => cmd_string(interp, argv),
+          _THROW => cmd_throw(interp, argv),
+          _TIME => cmd_time(interp, argv),
+          _UNSET => cmd_unset(interp, argv),
+          _WHILE => cmd_while(interp, argv),
+          // NOTICE: Extra native commands
+          $(
+            $native_name => $native_func(interp, argv),
+          )*
+          // NOTICE: Embedded commands
+          $(
+            $embedded_name => $embedded_func(interp, argv),
+          )*
+          // NOTICE: Proc commands
+          other => {
+            if let Some(proc) = interp.get_proc(other) {
+              proc.clone().execute(interp, argv)
+            } else {
+              molt_err!("invalid command name \"{}\"", name)
+            }
+          }
+        }
+      }
+      f as fn(&str, &mut Interp<$input>, &[Value]) -> MoltResult
+      },
+      {fn f(name: &str, interp: &Interp<$input>) -> Option<CommandType> {
+        match name {
+          _APPEND => Some(CommandType::Native),
+          _ARRAY => Some(CommandType::Native),
+          _ASSERT_EQ => Some(CommandType::Native),
+          _BREAK => Some(CommandType::Native),
+          _CATCH => Some(CommandType::Native),
+          _CONTINUE => Some(CommandType::Native),
+          _DICT => Some(CommandType::Native),
+          _ERROR => Some(CommandType::Native),
+          _EXPR => Some(CommandType::Native),
+          _FOR => Some(CommandType::Native),
+          _FOREACH => Some(CommandType::Native),
+          _GLOBAL => Some(CommandType::Native),
+          _IF => Some(CommandType::Native),
+          _INCR => Some(CommandType::Native),
+          _INFO => Some(CommandType::Native),
+          _JOIN => Some(CommandType::Native),
+          _LAPPEND => Some(CommandType::Native),
+          _LINDEX => Some(CommandType::Native),
+          _LIST => Some(CommandType::Native),
+          _LLENGTH => Some(CommandType::Native),
+          _PROC => Some(CommandType::Native),
+          _PUTS => Some(CommandType::Native),
+          _RENAME => Some(CommandType::Native),
+          _RETURN => Some(CommandType::Native),
+          _SET => Some(CommandType::Native),
+          _STRING => Some(CommandType::Native),
+          _THROW => Some(CommandType::Native),
+          _TIME => Some(CommandType::Native),
+          _UNSET => Some(CommandType::Native),
+          _WHILE => Some(CommandType::Native),
+          $(
+            $native_name => Some(CommandType::Native),
+          )*
+          $(
+            $embedded_name => Some(CommandType::Embedded),
+          )*
+          other => {
+            if interp.contains_proc(other) {
+              Some(CommandType::Proc)
+            } else {
+              None
+            }
+          }
+        }
+      }
+      f as fn(&str, &Interp<$input>) -> Option<CommandType>
+      },
+      &[
+        _APPEND,
+        _ARRAY,
+        _ASSERT_EQ,
+        _BREAK,
+        _CATCH,
+        _CONTINUE,
+        _DICT,
+        _ERROR,
+        _EXPR,
+        _FOR,
+        _FOREACH,
+        _GLOBAL,
+        _IF,
+        _INCR,
+        _INFO,
+        _JOIN,
+        _LAPPEND,
+        _LINDEX,
+        _LIST,
+        _LLENGTH,
+        _PROC,
+        _PUTS,
+        _RENAME,
+        _RETURN,
+        _SET,
+        _STRING,
+        _THROW,
+        _TIME,
+        _UNSET,
+        _WHILE,
+        $(
+            $native_name,
+        )*
+      ],
+      &[
+        $(
+          $embedded_name,
+        )*
+      ]
+    )
+  };
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::*;
+  use crate::*;
 
-    #[test]
-    fn test_molt_ok() {
-        let result: MoltResult = molt_ok!();
-        assert_eq!(Ok(Value::empty()), result);
+  #[test]
+  fn test_molt_ok() {
+    let result: MoltResult = molt_ok!();
+    assert_eq!(Ok(Value::empty()), result);
 
-        let result: MoltResult = molt_ok!(5);
-        assert_eq!(Ok(Value::from(5)), result);
+    let result: MoltResult = molt_ok!(5);
+    assert_eq!(Ok(Value::from(5)), result);
 
-        let result: MoltResult = molt_ok!("Five");
-        assert_eq!(Ok(Value::from("Five")), result);
+    let result: MoltResult = molt_ok!("Five");
+    assert_eq!(Ok(Value::from("Five")), result);
 
-        let result: MoltResult = molt_ok!("The answer is {}.", 5);
-        assert_eq!(Ok(Value::from("The answer is 5.")), result);
+    let result: MoltResult = molt_ok!("The answer is {}.", 5);
+    assert_eq!(Ok(Value::from("The answer is 5.")), result);
+  }
+
+  #[test]
+  fn test_molt_err() {
+    check_err(molt_err!("error message"), "error message");
+    check_err(molt_err!("error {}", 5), "error 5");
+  }
+
+  #[test]
+  fn test_molt_throw() {
+    check_throw(molt_throw!("MYERR", "error message"), "MYERR", "error message");
+    check_throw(molt_throw!("MYERR", "error {}", 5), "MYERR", "error 5");
+  }
+
+  fn check_err(result: MoltResult, msg: &str) -> bool {
+    match result {
+      Err(exception) => exception.is_error() && exception.value() == msg.into(),
+      _ => false,
     }
+  }
 
-    #[test]
-    fn test_molt_err() {
-        check_err(molt_err!("error message"), "error message");
-        check_err(molt_err!("error {}", 5), "error 5");
+  fn check_throw(result: MoltResult, code: &str, msg: &str) -> bool {
+    match result {
+      Err(exception) => {
+        exception.is_error()
+          && exception.value() == msg.into()
+          && exception.error_code() == code.into()
+      }
+      _ => false,
     }
-
-    #[test]
-    fn test_molt_throw() {
-        check_throw(
-            molt_throw!("MYERR", "error message"),
-            "MYERR",
-            "error message",
-        );
-        check_throw(molt_throw!("MYERR", "error {}", 5), "MYERR", "error 5");
-    }
-
-    fn check_err(result: MoltResult, msg: &str) -> bool {
-        match result {
-            Err(exception) => exception.is_error() && exception.value() == msg.into(),
-            _ => false,
-        }
-    }
-
-    fn check_throw(result: MoltResult, code: &str, msg: &str) -> bool {
-        match result {
-            Err(exception) => {
-                exception.is_error()
-                    && exception.value() == msg.into()
-                    && exception.error_code() == code.into()
-            }
-            _ => false,
-        }
-    }
+  }
 }

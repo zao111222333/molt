@@ -1,0 +1,136 @@
+# An example Trunk.toml with all possible fields along with their defaults.
+
+# A sem-ver version requirement of trunk required for this project
+trunk-version = "*"
+
+[build]
+# The index HTML file to drive the bundling process.
+target = "index.html"
+# Build in release mode.
+release = true
+# The output dir for all final assets.
+dist = "dist"
+# The public URL from which assets are to be served.
+public_url = "./"
+# Whether to include hash values in the output file names.
+filehash = true
+# Whether to inject scripts (and module preloads) into the finalized output.
+inject_scripts = true
+# Run without network access
+offline = false
+# Require Cargo.lock and cache are up to date
+frozen = false
+# Require Cargo.lock is up to date
+locked = false
+# Control minification
+minify = "never" # can be one of: never, on_release, always
+# Allow disabling sub-resource integrity (SRI)
+no_sri = false
+
+[watch]
+# Paths to watch. The `build.target`'s parent folder is watched by default.
+watch = []
+# Paths to ignore.
+ignore = []
+
+[serve]
+# The address to serve on.
+addresses = ["127.0.0.1"]
+# The port to serve on.
+port = 9000
+# Open a browser tab once the initial build is complete.
+open = false
+release = false
+# Disable auto-reload of the web app.
+no_autoreload = false
+# Disable error reporting
+no_error_reporting = false
+# Additional headers set for responses.
+# headers = { "test-header" = "header value", "test-header2" = "header value 2" }
+# Protocol used for autoreload WebSockets connection.
+ws_protocol = "ws"
+# The certificate/private key pair to use for TLS, which is enabled if both are set.
+# tls_key_path = "self_signed_certs/key.pem"
+# tls_cert_path = "self_signed_certs/cert.pem"
+
+[clean]
+# The output dir for all final assets.
+dist = "dist"
+# Optionally perform a cargo clean.
+cargo = false
+
+# [tools]
+# # Default dart-sass version to download.
+# sass = "1.69.5"
+# # Default wasm-bindgen version to download.
+# wasm_bindgen = "0.2.89"
+# # Default wasm-opt version to download.
+# wasm_opt = "version_116"
+# # Default tailwindcss-cli version to download.
+# tailwindcss = "3.3.5"
+
+## proxy
+# Proxies are optional, and default to `None`.
+# Proxies are only run as part of the `trunk serve` command.
+
+# [[proxy]]
+# # This WebSocket proxy example has a backend and ws field. This example will listen for
+# # WebSocket connections at `/api/ws` and proxy them to `ws://localhost:9000/api/ws`.
+# backend = "ws://localhost:9000/api/ws"
+# ws = true
+
+# [[proxy]]
+# # This proxy example has a backend and a rewrite field. Requests received on `rewrite` will be
+# # proxied to the backend after rewriting the `rewrite` prefix to the `backend`'s URI prefix.
+# # E.G., `/api/v1/resource/x/y/z` -> `/resource/x/y/z`
+# rewrite = "/api/v1/"
+# backend = "http://localhost:9000/"
+
+# [[proxy]]
+# # This proxy specifies only the backend, which is the only required field. In this example,
+# # request URIs are not modified when proxied.
+# backend = "http://localhost:9000/api/v2/"
+
+# [[proxy]]
+# # This proxy example has an insecure field. In this example,
+# # connections to https://localhost:9000/api/v3/ will not have certificate validation performed.
+# # This is useful for development with a server using self-signed certificates.
+# backend = "https://localhost:9000/api/v3/"
+# insecure = true
+
+# [[proxy]]
+# # This proxy example has the no_system_proxy field. In this example,
+# # connections to https://172.16.0.1:9000/api/v3/ will bypass the system proxy.
+# # This may be useful in cases where a local system has a proxy configured which cannot be reconfigured, but the
+# # proxy target (of trunk serve) is not know/accessible by the system's proxy.
+# backend = "https://172.16.0.1:9000/api/v3/"
+# no_system_proxy = true
+
+# ## hooks
+# # Hooks are optional, and default to `None`.
+# # Hooks are executed as part of Trunk's main build pipeline, no matter how it is run.
+
+# [[hooks]]
+# # This hook example shows all the current available fields. It will execute the equivalent of
+# # typing "echo Hello Trunk!" right at the start of the build process (even before the HTML file
+# # is read). By default, the command is spawned directly and no shell is used.
+# stage = "pre_build"
+# command = "echo"
+# command_arguments = ["Hello", "Trunk!"]
+
+# [[hooks]]
+# # This hook example shows running a command inside a shell. As a result, features such as variable
+# # interpolation are available. This shows the TRUNK_STAGING_DIR environment variable, one of a set
+# # of default variables that Trunk inserts into your hook's environment. Additionally, this hook
+# # uses the build stage, meaning it executes in parallel with all of the existing asset pipelines.
+# stage = "build"
+# command = "sh"
+# command_arguments = ["-c", "echo Staging directory: $TRUNK_STAGING_DIR"]
+
+# [[hooks]]
+# # This hook example shows how command_arguments defaults to an empty list when absent. It also uses
+# # the post_build stage, meaning it executes after the rest of the build is complete, just before
+# # the staging directory is copied over the dist directory. This means that it has access to all
+# # built assets, including the HTML file generated by trunk.
+# stage = "post_build"
+# command = "ls"

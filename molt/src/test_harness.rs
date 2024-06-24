@@ -2,8 +2,8 @@
 //!
 //! A Molt test script is a Molt script containing tests of Molt code.  Each
 //! test is a call of the Molt `test` command provided by the
-//! `molt_ng::test_harness` module.  The tests are executed in the context of the
-//! the application's `molt_ng::Interp` (and so can test application-specific commands).
+//! `molt::test_harness` module.  The tests are executed in the context of the
+//! the application's `molt::Interp` (and so can test application-specific commands).
 //!
 //! The test harness keeps track of the number of tests executed, and whether they
 //! passed, failed, or returned an unexpected error.
@@ -22,16 +22,8 @@
 //!
 //! See the Molt Book (or the Molt test suite) for examples of test scripts.
 
-use crate::check_args;
-use crate::molt_ok;
-use crate::types::ContextID;
-use crate::Interp;
-use crate::MoltResult;
-use crate::ResultCode;
-use crate::Value;
-use std::env;
-use std::fs;
-use std::path::PathBuf;
+use crate::{check_args, molt_ok, prelude::Interp, MoltResult, ResultCode, Value};
+use std::{env, fs, path::PathBuf};
 
 /// Executes the Molt test harness, given the command-line arguments,
 /// in the context of the given interpreter.
@@ -41,13 +33,13 @@ use std::path::PathBuf;
 /// to execute.  The remaining elements are meant to be test harness options,
 /// but are currently ignored.
 ///
-/// See [`molt_ng::interp`](../molt/interp/index.html) for details on how to configure and
+/// See [`molt::interp`](../molt/interp/index.html) for details on how to configure and
 /// add commands to a Molt interpreter.
 ///
 /// # Example
 ///
 /// ```
-/// use molt_ng::Interp;
+/// use molt::Interp;
 /// use std::env;
 ///
 /// // FIRST, get the command line arguments.
@@ -60,13 +52,16 @@ use std::path::PathBuf;
 ///
 /// // NEXT, evaluate the file, if any.
 /// if args.len() > 1 {
-///     molt_ng::test_harness(&mut interp, &args[1..]);
+///     molt::test_harness(&mut interp, &args[1..]);
 /// } else {
 ///     eprintln!("Usage: mytest *filename.tcl");
 /// }
 /// ```
 
-pub fn test_harness(interp: &mut Interp, args: &[String]) -> Result<(), ()> {
+pub fn test_harness<Ctx>(
+    interp: &mut Interp<(Ctx, TestCtx)>,
+    args: &[String],
+) -> Result<(), ()> {
     // FIRST, announce who we are.
     println!("Molt {} -- Test Harness", env!("CARGO_PKG_VERSION"));
 
@@ -78,11 +73,8 @@ pub fn test_harness(interp: &mut Interp, args: &[String]) -> Result<(), ()> {
 
     let path = PathBuf::from(&args[0]);
 
-    // NEXT, initialize the test result.
-    let context_id = interp.save_context(TestContext::new());
-
     // NEXT, install the test commands into the interpreter.
-    interp.add_context_command("test", test_cmd, &[context_id]);
+    // interp.add_command("test", test_cmd);
 
     // NEXT, execute the script.
     match fs::read_to_string(&args[0]) {
@@ -108,7 +100,7 @@ pub fn test_harness(interp: &mut Interp, args: &[String]) -> Result<(), ()> {
     }
 
     // NEXT, output the test results:
-    let ctx = interp.context::<TestContext>(context_id);
+    let ctx = &mut interp.context.1;
     println!(
         "\n{} tests, {} passed, {} failed, {} errors",
         ctx.num_tests, ctx.num_passed, ctx.num_failed, ctx.num_errors
@@ -121,15 +113,15 @@ pub fn test_harness(interp: &mut Interp, args: &[String]) -> Result<(), ()> {
     }
 }
 
-struct TestContext {
+pub struct TestCtx {
     num_tests: usize,
     num_passed: usize,
     num_failed: usize,
     num_errors: usize,
 }
 
-impl TestContext {
-    fn new() -> Self {
+impl TestCtx {
+    pub fn new() -> Self {
         Self {
             num_tests: 0,
             num_passed: 0,
@@ -192,7 +184,9 @@ impl TestInfo {
             Ok(val) => println!("Received -ok <{}>", val),
             Err(exception) => match exception.code() {
                 ResultCode::Error => println!("Received -error <{}>", exception.value()),
-                ResultCode::Return => println!("Received -return <{}>", exception.value()),
+                ResultCode::Return => {
+                    println!("Received -return <{}>", exception.value())
+                }
                 ResultCode::Break => println!("Received -break <>"),
                 ResultCode::Continue => println!("Received -continue <>"),
                 _ => unimplemented!(),
@@ -201,10 +195,7 @@ impl TestInfo {
     }
 
     fn print_helper_error(&self, part: &str, msg: &str) {
-        println!(
-            "\n*** ERROR (in {}) {} {}",
-            part, self.name, self.description
-        );
+        println!("\n*** ERROR (in {}) {} {}", part, self.name, self.description);
         println!("    {}", msg);
     }
 }
@@ -217,21 +208,21 @@ impl TestInfo {
 /// point I'll need something much more robust.
 ///
 /// Note: See the Molt Book for the full syntax.
-fn test_cmd(interp: &mut Interp, context_ids: &[ContextID], argv: &[Value]) -> MoltResult {
+pub fn test_cmd<Ctx>(interp: &mut Interp<(Ctx, TestCtx)>, argv: &[Value]) -> MoltResult {
     // FIRST, check the minimum command line.
     check_args(1, argv, 4, 0, "name description args...")?;
 
     // NEXT, see which kind of command it is.
     let arg = argv[3].as_str();
     if arg.starts_with('-') {
-        fancy_test(interp, context_ids, argv)
+        fancy_test(interp, argv)
     } else {
-        simple_test(interp, context_ids, argv)
+        simple_test(interp, argv)
     }
 }
 
 // The simple version of the test command.
-fn simple_test(interp: &mut Interp, context_ids: &[ContextID], argv: &[Value]) -> MoltResult {
+fn simple_test<Ctx>(interp: &mut Interp<(Ctx, TestCtx)>, argv: &[Value]) -> MoltResult {
     check_args(1, argv, 6, 6, "name description script -ok|-error result")?;
 
     // FIRST, get the test info
@@ -246,26 +237,20 @@ fn simple_test(interp: &mut Interp, context_ids: &[ContextID], argv: &[Value]) -
     } else if code == "-error" {
         Code::Error
     } else {
-        incr_errors(interp, context_ids);
+        incr_errors(interp);
         info.print_helper_error("test command", &format!("invalid option: \"{}\"", code));
 
         return molt_ok!();
     };
 
     // NEXT, run the test.
-    run_test(interp, context_ids, &info);
+    run_test(interp, &info);
     molt_ok!()
 }
 
 // The fancier, more flexible version of the test.
-fn fancy_test(interp: &mut Interp, context_ids: &[ContextID], argv: &[Value]) -> MoltResult {
-    check_args(
-        1,
-        argv,
-        4,
-        0,
-        "name description option value ?option value...?",
-    )?;
+fn fancy_test<Ctx>(interp: &mut Interp<(Ctx, TestCtx)>, argv: &[Value]) -> MoltResult {
+    check_args(1, argv, 4, 0, "name description option value ?option value...?")?;
 
     // FIRST, get the test tinfo
     let mut info = TestInfo::new(argv[1].as_str(), argv[2].as_str());
@@ -279,8 +264,11 @@ fn fancy_test(interp: &mut Interp, context_ids: &[ContextID], argv: &[Value]) ->
 
         let val = iter.next();
         if val.is_none() {
-            incr_errors(interp, context_ids);
-            info.print_helper_error("test command", &format!("missing value for {}", opt));
+            incr_errors(interp);
+            info.print_helper_error(
+                "test command",
+                &format!("missing value for {}", opt),
+            );
             return molt_ok!();
         }
         let val = val.unwrap().as_str();
@@ -298,20 +286,23 @@ fn fancy_test(interp: &mut Interp, context_ids: &[ContextID], argv: &[Value]) ->
                 info.expect = val.to_string();
             }
             _ => {
-                incr_errors(interp, context_ids);
-                info.print_helper_error("test command", &format!("invalid option: \"{}\"", val));
+                incr_errors(interp);
+                info.print_helper_error(
+                    "test command",
+                    &format!("invalid option: \"{}\"", val),
+                );
                 return molt_ok!();
             }
         }
     }
 
     // NEXT, run the test.
-    run_test(interp, context_ids, &info);
+    run_test(interp, &info);
     molt_ok!()
 }
 
 // Run the actual test and save the result.
-fn run_test(interp: &mut Interp, context_ids: &[ContextID], info: &TestInfo) {
+fn run_test<Ctx>(interp: &mut Interp<(Ctx, TestCtx)>, info: &TestInfo) {
     // FIRST, push a variable scope; -setup, -body, and -cleanup will share it.
     interp.push_scope();
 
@@ -345,7 +336,7 @@ fn run_test(interp: &mut Interp, context_ids: &[ContextID], info: &TestInfo) {
     interp.pop_scope();
 
     // NEXT, get the context and save the results.
-    let ctx = interp.context::<TestContext>(context_ids[0]);
+    let ctx = &mut interp.context.1;
     ctx.num_tests += 1;
 
     match &result {
@@ -377,6 +368,6 @@ fn run_test(interp: &mut Interp, context_ids: &[ContextID], info: &TestInfo) {
 }
 
 // Increment the failure counter.
-fn incr_errors(interp: &mut Interp, context_ids: &[ContextID]) {
-    interp.context::<TestContext>(context_ids[0]).num_errors += 1;
+fn incr_errors<Ctx>(interp: &mut Interp<(Ctx, TestCtx)>) {
+    interp.context.1.num_errors += 1;
 }

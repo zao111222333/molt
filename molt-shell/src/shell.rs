@@ -1,6 +1,4 @@
-use molt_ng::Interp;
-use molt_ng::MoltList;
-use molt_ng::Value;
+use molt_forked::prelude::*;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::fs;
@@ -15,13 +13,13 @@ use std::fs;
 /// To change the prompt, set the `tcl_prompt1` TCL variable to a script that returns
 /// the desired prompt.
 ///
-/// See [`molt_ng::interp`](../molt/interp/index.html) for details on how to configure and
+/// See [`molt::interp`](../molt/interp/index.html) for details on how to configure and
 /// add commands to a Molt interpreter.
 ///
 /// # Example
 ///
 /// ```
-/// use molt_ng::Interp;
+/// use molt::Interp;
 ///
 /// // FIRST, create and initialize the interpreter.
 /// let mut interp = Interp::new();
@@ -29,9 +27,9 @@ use std::fs;
 /// // NOTE: commands can be added to the interpreter here.
 ///
 /// // NEXT, invoke the REPL.
-/// molt_ng_shell::repl(&mut interp);
+/// molt_shell::repl(&mut interp);
 /// ```
-pub fn repl(interp: &mut Interp) {
+pub fn repl<Ctx: 'static>(interp: &mut Interp<Ctx>) {
     let mut rl = Editor::<()>::new();
 
     loop {
@@ -94,13 +92,13 @@ pub fn repl(interp: &mut Interp) {
 /// * The Molt variable `argv` will be set to a Molt list containing the remainder of the
 ///   `argv` array.
 ///
-/// See [`molt_ng::interp`](../molt/interp/index.html) for details on how to configure and
+/// See [`molt::interp`](../molt/interp/index.html) for details on how to configure and
 /// add commands to a Molt interpreter.
 ///
 /// # Example
 ///
 /// ```
-/// use molt_ng::Interp;
+/// use molt::Interp;
 /// use std::env;
 ///
 /// // FIRST, get the command line arguments.
@@ -113,12 +111,12 @@ pub fn repl(interp: &mut Interp) {
 ///
 /// // NEXT, evaluate the file, if any.
 /// if args.len() > 1 {
-///     molt_ng_shell::script(&mut interp, &args[1..]);
+///     molt_shell::script(&mut interp, &args[1..]);
 /// } else {
 ///     eprintln!("Usage: myshell *filename.tcl");
 /// }
 /// ```
-pub fn script(interp: &mut Interp, args: &[String]) {
+pub fn script<Ctx: 'static>(interp: &mut Interp<Ctx>, args: &[String]) {
     let arg0 = &args[0];
     let argv = &args[1..];
     match fs::read_to_string(&args[0]) {
@@ -139,7 +137,12 @@ pub fn script(interp: &mut Interp, args: &[String]) {
 ///
 /// * The Molt variable `arg0` will be set to the `arg0` value.
 /// * The Molt variable `argv` will be set to the `argv` array as a Molt list.
-fn execute_script(interp: &mut Interp, script: String, arg0: &str, argv: &[String]) {
+fn execute_script<Ctx: 'static>(
+    interp: &mut Interp<Ctx>,
+    script: String,
+    arg0: &str,
+    argv: &[String],
+) {
     let argv: MoltList = argv.iter().map(Value::from).collect();
     interp
         .set_scalar("arg0", Value::from(arg0))

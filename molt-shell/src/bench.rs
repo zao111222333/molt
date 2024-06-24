@@ -2,7 +2,7 @@
 //!
 //! A Molt benchmark script is a Molt script containing benchmarks of Molt code.  Each
 //! benchmark is a call of the Molt `benchmark` command provided by the
-//! `molt_ng_shell::bench` module.  The benchmarks are executed in the context of the
+//! `molt_shell::bench` module.  The benchmarks are executed in the context of the
 //! the application's `molt::Interp` (and so can benchmark application-specific commands).
 //!
 //! The harness executes each benchmark many times and retains the average run-time
@@ -12,16 +12,9 @@
 //! See the Molt Book (or the Molt benchmark suite) for how to write
 //! benchmarks and examples of benchmark scripts.
 
-use molt_ng::check_args;
-use molt_ng::molt_ok;
-use molt_ng::ContextID;
-use molt_ng::Interp;
-use molt_ng::MoltInt;
-use molt_ng::MoltResult;
-use molt_ng::Value;
-use std::env;
-use std::fs;
-use std::path::PathBuf;
+// use molt::{check_args, molt_ok, Interp, MoltInt, MoltResult, Value};
+use molt_forked::prelude::*;
+use std::{env, fs, path::PathBuf};
 
 /// Executes the Molt benchmark harness, given the command-line arguments,
 /// in the context of the given interpreter.
@@ -31,13 +24,13 @@ use std::path::PathBuf;
 /// of options, see The Molt Book or execute this function with an empty argument
 /// list.
 ///
-/// See [`molt_ng::interp`](../molt/interp/index.html) for details on how to configure and
+/// See [`molt::interp`](../molt/interp/index.html) for details on how to configure and
 /// add commands to a Molt interpreter.
 ///
 /// # Example
 ///
 /// ```
-/// use molt_ng::Interp;
+/// use molt::Interp;
 /// use std::env;
 ///
 /// // FIRST, get the command line arguments.
@@ -50,12 +43,12 @@ use std::path::PathBuf;
 ///
 /// // NEXT, evaluate the file, if any.
 /// if args.len() > 1 {
-///     molt_ng_shell::benchmark(&mut interp, &args[1..]);
+///     molt_shell::benchmark(&mut interp, &args[1..]);
 /// } else {
 ///     eprintln!("Usage: mybench *filename.tcl");
 /// }
 /// ```
-pub fn benchmark(interp: &mut Interp, args: &[String]) {
+pub fn benchmark<Ctx>(interp: &mut Interp<(Ctx, BenchCtx)>, args: &[String]) {
     // FIRST, get the script file name
     if args.is_empty() {
         eprintln!("Missing benchmark script.");
@@ -91,20 +84,9 @@ pub fn benchmark(interp: &mut Interp, args: &[String]) {
     // the `source` command can find scripts there.
     let path = PathBuf::from(&args[0]);
 
-    // NEXT, initialize the benchmark context.
-    let context_id = interp.save_context(Context::new());
-
-    // NEXT, install the test commands into the interpreter.
-    interp.add_command("ident", cmd_ident);
-    interp.add_context_command("measure", measure_cmd, &[context_id]);
-    interp.add_command("ok", cmd_ok);
-
     // NEXT, load the benchmark Tcl library
     if let Err(exception) = interp.eval(include_str!("bench.tcl")) {
-        panic!(
-            "Error in benchmark Tcl library: {}",
-            exception.value().as_str()
-        );
+        panic!("Error in benchmark Tcl library: {}", exception.value().as_str());
     }
 
     // NEXT, execute the script.
@@ -126,7 +108,7 @@ pub fn benchmark(interp: &mut Interp, args: &[String]) {
     }
 
     // NEXT, output the test results:
-    let ctx = interp.context::<Context>(context_id);
+    let ctx = &mut interp.context.1;
 
     if output_csv {
         write_csv(ctx);
@@ -135,7 +117,7 @@ pub fn benchmark(interp: &mut Interp, args: &[String]) {
     }
 }
 
-fn write_csv(ctx: &Context) {
+fn write_csv(ctx: &BenchCtx) {
     println!("\"benchmark\",\"description\",\"nanos\",\"norm\"");
 
     let baseline = ctx.baseline();
@@ -152,14 +134,12 @@ fn write_csv(ctx: &Context) {
 }
 
 fn strip_quotes(string: &str) -> String {
-    let out: String = string
-        .chars()
-        .map(|ch| if ch == '\"' { '\'' } else { ch })
-        .collect();
+    let out: String =
+        string.chars().map(|ch| if ch == '\"' { '\'' } else { ch }).collect();
     out
 }
 
-fn write_formatted_text(ctx: &Context) {
+fn write_formatted_text(ctx: &BenchCtx) {
     write_version();
     println!();
     println!("{:>8} {:>8} -- Benchmark", "Nanos", "Norm");
@@ -187,7 +167,7 @@ fn write_usage() {
     println!("Usage: molt bench filename.tcl [-csv]");
 }
 
-struct Context {
+pub struct BenchCtx {
     // The baseline, in microseconds
     baseline: Option<MoltInt>,
 
@@ -195,12 +175,9 @@ struct Context {
     measurements: Vec<Measurement>,
 }
 
-impl Context {
-    fn new() -> Self {
-        Self {
-            baseline: None,
-            measurements: Vec::new(),
-        }
+impl BenchCtx {
+    pub fn new() -> Self {
+        Self { baseline: None, measurements: Vec::new() }
     }
 
     fn baseline(&self) -> MoltInt {
@@ -222,8 +199,11 @@ struct Measurement {
 /// # measure *name* *description* *micros*
 ///
 /// Records a benchmark measurement.
-fn measure_cmd(interp: &mut Interp, context_ids: &[ContextID], argv: &[Value]) -> MoltResult {
-    molt_ng::check_args(1, argv, 4, 4, "name description nanos")?;
+pub fn measure_cmd<Ctx: 'static>(
+    interp: &mut Interp<(Ctx, BenchCtx)>,
+    argv: &[Value],
+) -> MoltResult {
+    check_args(1, argv, 4, 4, "name description nanos")?;
 
     // FIRST, get the arguments
     let name = argv[1].to_string();
@@ -231,17 +211,13 @@ fn measure_cmd(interp: &mut Interp, context_ids: &[ContextID], argv: &[Value]) -
     let nanos = argv[3].as_int()?;
 
     // NEXT, get the test context
-    let ctx = interp.context::<Context>(context_ids[0]);
+    let ctx = &mut interp.context.1;
 
     if ctx.baseline.is_none() {
         ctx.baseline = Some(nanos);
     }
 
-    let record = Measurement {
-        name,
-        description,
-        nanos,
-    };
+    let record = Measurement { name, description, nanos };
 
     ctx.measurements.push(record);
 
@@ -251,7 +227,10 @@ fn measure_cmd(interp: &mut Interp, context_ids: &[ContextID], argv: &[Value]) -
 /// # ident value
 ///
 /// Returns its argument.
-fn cmd_ident(_interp: &mut Interp, _: &[ContextID], argv: &[Value]) -> MoltResult {
+pub fn cmd_ident<Ctx: 'static>(
+    _interp: &mut Interp<(Ctx, BenchCtx)>,
+    argv: &[Value],
+) -> MoltResult {
     check_args(1, argv, 2, 2, "value")?;
 
     molt_ok!(argv[1].clone())
@@ -260,6 +239,9 @@ fn cmd_ident(_interp: &mut Interp, _: &[ContextID], argv: &[Value]) -> MoltResul
 /// # ok ...
 ///
 /// Takes any number of arguments, and returns "".
-fn cmd_ok(_interp: &mut Interp, _: &[ContextID], _argv: &[Value]) -> MoltResult {
+pub fn cmd_ok<Ctx: 'static>(
+    _interp: &mut Interp<(Ctx, BenchCtx)>,
+    _argv: &[Value],
+) -> MoltResult {
     molt_ok!()
 }

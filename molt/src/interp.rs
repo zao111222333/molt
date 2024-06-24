@@ -35,8 +35,8 @@
 //! empty interpreter.
 //!
 //! ```
-//! use molt_ng::Interp;
-//! let mut interp = Interp::new();
+//! use molt::Interp;
+//! let mut interp = Interp::default();
 //!
 //! // add commands, evaluate scripts, etc.
 //! ```
@@ -53,15 +53,15 @@
 //! For example, the following snippet uses the Molt `expr` command to evaluate an expression.
 //!
 //! ```
-//! use molt_ng::Interp;
-//! use molt_ng::molt_ok;
-//! use molt_ng::types::*;
+//! use molt::Interp;
+//! use molt::molt_ok;
+//! use molt::types::*;
 //!
 //! let _ = my_func();
 //!
 //! fn my_func() -> MoltResult {
 //! // FIRST, create the interpreter and add the needed command.
-//! let mut interp = Interp::new();
+//! let mut interp = Interp::default();
 //!
 //! // NEXT, evaluate a script containing an expression,
 //! // propagating errors back to the caller
@@ -107,14 +107,14 @@
 //! as in the `if` or `while` commands:
 //!
 //! ```
-//! use molt_ng::Interp;
-//! use molt_ng::molt_ok;
-//! use molt_ng::types::*;
+//! use molt::Interp;
+//! use molt::molt_ok;
+//! use molt::types::*;
 //!
 //! # let _ = dummy();
 //! # fn dummy() -> MoltResult {
 //! // FIRST, create the interpreter
-//! let mut interp = Interp::new();
+//! let mut interp = Interp::default();
 //!
 //! // NEXT, get an expression as a Value.  In a command body it would
 //! // usually be passed in as a Value.
@@ -144,15 +144,15 @@
 //! The following example defines a command called `square` that squares an integer value.
 //!
 //! ```
-//! use molt_ng::Interp;
-//! use molt_ng::check_args;
-//! use molt_ng::molt_ok;
-//! use molt_ng::types::*;
+//! use molt::Interp;
+//! use molt::check_args;
+//! use molt::molt_ok;
+//! use molt::types::*;
 //!
 //! # let _ = dummy();
 //! # fn dummy() -> MoltResult {
 //! // FIRST, create the interpreter and add the needed command.
-//! let mut interp = Interp::new();
+//! let mut interp = Interp::default();
 //! interp.add_command("square", cmd_square);
 //!
 //! // NEXT, try using the new command.
@@ -223,10 +223,10 @@
 //! for example, returns the assigned or retrieved value; it is defined like this:
 //!
 //! ```
-//! use molt_ng::Interp;
-//! use molt_ng::check_args;
-//! use molt_ng::molt_ok;
-//! use molt_ng::types::*;
+//! use molt::Interp;
+//! use molt::check_args;
+//! use molt::molt_ok;
+//! use molt::types::*;
 //!
 //! pub fn cmd_set(interp: &mut Interp, _: &[ContextID], argv: &[Value]) -> MoltResult {
 //!    check_args(1, argv, 2, 3, "varName ?newValue?")?;
@@ -302,10 +302,10 @@
 //! number of failures, etc.  This can be implemented as follows:
 //!
 //! ```
-//! use molt_ng::Interp;
-//! use molt_ng::check_args;
-//! use molt_ng::molt_ok;
-//! use molt_ng::types::*;
+//! use molt::Interp;
+//! use molt::check_args;
+//! use molt::molt_ok;
+//! use molt::types::*;
 //!
 //! // The context structure to hold the stats
 //! struct Stats {
@@ -324,7 +324,7 @@
 //! # let _ = dummy();
 //! # fn dummy() -> MoltResult {
 //! // Create the interpreter.
-//! let mut interp = Interp::new();
+//! let mut interp = Interp::default();
 //!
 //! // Create the context struct, assigning a context ID
 //! let context_id = interp.save_context(Stats::new());
@@ -439,11 +439,10 @@
 //! [`CommandFunc`]: ../types/type.CommandFunc.html
 //! [`Value`]: ../value/index.html
 //! [`Interp`]: struct.Interp.html
-
 use crate::check_args;
-use crate::commands;
 use crate::dict::dict_new;
 use crate::expr;
+use crate::gen_command;
 use crate::list::list_to_string;
 use crate::molt_err;
 use crate::molt_ok;
@@ -453,10 +452,15 @@ use crate::parser::Word;
 use crate::scope::ScopeStack;
 use crate::types::*;
 use crate::value::Value;
-use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::time::Instant;
+cfg_if::cfg_if! {
+  if #[cfg(feature = "wasm")] {
+    use wasm_timer::Instant;
+  }else{
+    use std::time::Instant;
+  }
+}
 
 // Constants
 const OPT_CODE: &str = "-code";
@@ -465,6 +469,29 @@ const OPT_ERRORCODE: &str = "-errorcode";
 const OPT_ERRORINFO: &str = "-errorinfo";
 const ZERO: &str = "0";
 
+pub enum CommandType {
+    Native,
+    Embedded,
+    Proc,
+}
+pub struct Command<Ctx: 'static> {
+    fn_execute: fn(&str, &mut Interp<Ctx>, &[Value]) -> MoltResult,
+    fn_type: fn(&str, &Interp<Ctx>) -> Option<CommandType>,
+    native_names: &'static [&'static str],
+    embedded_names: &'static [&'static str],
+}
+impl<Ctx> Command<Ctx> {
+    pub fn new(
+        fn_execute: fn(&str, &mut Interp<Ctx>, &[Value]) -> MoltResult,
+        fn_type: fn(&str, &Interp<Ctx>) -> Option<CommandType>,
+        native_names: &'static [&'static str],
+        embedded_names: &'static [&'static str],
+    ) -> Self {
+        Self { fn_execute, fn_type, native_names, embedded_names }
+    }
+}
+cfg_if::cfg_if! {
+  if #[cfg(feature = "wasm")] {
 /// The Molt Interpreter.
 ///
 /// The `Interp` struct is the primary API for
@@ -481,11 +508,11 @@ const ZERO: &str = "0";
 /// Molt commands.
 ///
 /// ```
-/// use molt_ng::types::*;
-/// use molt_ng::Interp;
-/// use molt_ng::molt_ok;
+/// use molt::types::*;
+/// use molt::Interp;
+/// use molt::molt_ok;
 /// # fn dummy() -> MoltResult {
-/// let mut interp = Interp::new();
+/// let mut interp = Interp::default();
 /// let four = interp.eval("expr {2 + 2}")?;
 /// assert_eq!(four, Value::from(4));
 /// # molt_ok!()
@@ -496,156 +523,91 @@ const ZERO: &str = "0";
 /// to create contexts consisting of references and mutable references
 /// within that lifetime. Under the hood, the references are stored as
 /// raw pointers.
-#[derive(Default)]
-pub struct Interp<'i> {
-    // Command Table
-    commands: HashMap<String, Rc<Command>>,
+pub struct Interp<Ctx> where
+  Ctx: 'static,
+{
+  // Command Table
+  command: Command<Ctx>,
+  procs: HashMap<String, Rc<Procedure>>,
+  // Variable Table
+  scopes: ScopeStack,
 
-    // Variable Table
-    scopes: ScopeStack,
+  /// Embedded context
+  pub context: Ctx,
+  pub std_buff: Vec<Result<Value,Exception>>,
+  // Defines the recursion limit for Interp::eval().
+  recursion_limit: usize,
 
-    // Context ID Counter
-    last_context_id: u64,
+  // Current number of eval levels.
+  num_levels: usize,
 
-    // Context Map
-    context_map: HashMap<ContextID, ContextBox<'i>>,
+  // Profile Map
+  profile_map: HashMap<String, ProfileRecord>,
 
-    // Defines the recursion limit for Interp::eval().
-    recursion_limit: usize,
-
-    // Current number of eval levels.
-    num_levels: usize,
-
-    // Profile Map
-    profile_map: HashMap<String, ProfileRecord>,
-
-    // Whether to continue execution in case of error.
-    continue_on_error: bool,
+  // Whether to continue execution in case of error.
+  continue_on_error: bool,
 }
-
-/// A command defined in the interpreter.
-enum Command {
-    /// A binary command implemented as a Rust CommandFunc.
-    Native(CommandFunc, Vec<ContextID>),
-
-    /// A Molt procedure
-    Proc(Procedure),
-}
-
-impl Command {
-    /// Execute the command according to its kind.
-    fn execute(&self, interp: &mut Interp, argv: &[Value]) -> MoltResult {
-        match self {
-            Command::Native(func, context_ids) => func(interp, context_ids, argv),
-            Command::Proc(proc) => proc.execute(interp, argv),
-        }
-    }
-
-    /// Returns a value naming the command type.
-    fn cmdtype(&self) -> Value {
-        match self {
-            Command::Native(_, _) => Value::from("native"),
-            Command::Proc(_) => Value::from("proc"),
-        }
-    }
-
-    /// Gets the command's context, or empty slice if none.
-    fn context_ids(&self) -> &[ContextID] {
-        match self {
-            Command::Native(_, context_ids) => context_ids,
-            _ => &[],
-        }
-    }
-
-    /// Returns true if the command is a proc, and false otherwise.
-    fn is_proc(&self) -> bool {
-        if let Command::Proc(_) = self {
-            true
-        } else {
-            false
-        }
-    }
-}
-
-/// An internal wrapper intended to contain a raw pointer.
-/// It is not associated with a lifetime in order to be stored in a
-/// `ContextBox` which uses `Any`.
+  }else{
+    /// The Molt Interpreter.
 ///
-/// This is better than storing a raw pointer directly in `Any`,
-/// because a user might store a raw pointer manually and retrive it
-/// as a mutable reference. We can't control the safety of user-provided
-/// raw pointers except if we obtained it from a good-shape
-/// mutable reference ourselves, and wrapped it inside this trust box.
+/// The `Interp` struct is the primary API for
+/// embedding Molt into a Rust application.  The application creates an instance
+/// of `Interp`, configures with it the required set of application-specific
+/// and standard Molt commands, and then uses it to evaluate Molt scripts and
+/// expressions.  See the
+/// [module level documentation](index.html)
+/// for an overview.
 ///
-/// Safety: should ONLY be created within `ContextBox` methods.
-struct WrappedPointer<T: 'static>(T);
+/// # Example
+///
+/// By default, the `Interp` comes configured with the full set of standard
+/// Molt commands.
+///
+/// ```
+/// use molt::types::*;
+/// use molt::Interp;
+/// use molt::molt_ok;
+/// # fn dummy() -> MoltResult {
+/// let mut interp = Interp::default();
+/// let four = interp.eval("expr {2 + 2}")?;
+/// assert_eq!(four, Value::from(4));
+/// # molt_ok!()
+/// # }
+/// ```
+///
+/// The `Interp` can be associated with a lifetime. If so, it is allowed
+/// to create contexts consisting of references and mutable references
+/// within that lifetime. Under the hood, the references are stored as
+/// raw pointers.
+pub struct Interp<Ctx> where
+  Ctx: 'static,
+{
+  // Command Table
+  command: Command<Ctx>,
+  pub procs: HashMap<String, Rc<Procedure>>,
+  // Variable Table
+  scopes: ScopeStack,
 
-/// A container for a command's context struct, containing the context in a box,
-/// and a reference count.
-///
-/// The reference count is incremented when the context's ID is used with a command,
-/// and decremented when the command is forgotten.  If the reference count is
-/// decremented to zero, the context is removed.
-struct ContextBox<'i> {
-    data: Box<dyn Any>,
-    ref_count: usize,
-    // Marks the lifetime 'i as used, to avoid [compiler complains](https://doc.rust-lang.org/std/marker/struct.PhantomData.html).
-    phantom: std::marker::PhantomData<&'i u8>,
+  /// Embedded context
+  pub context: Ctx,
+
+  // Defines the recursion limit for Interp::eval().
+  recursion_limit: usize,
+
+  // Current number of eval levels.
+  num_levels: usize,
+
+  // Profile Map
+  profile_map: HashMap<String, ProfileRecord>,
+
+  // Whether to continue execution in case of error.
+  continue_on_error: bool,
 }
 
-impl<'i> ContextBox<'i> {
-    /// Creates a new context box for the given data, and sets its reference count to 0.
-    fn new<T: 'static>(data: T) -> Self {
-        Self {
-            data: Box::new(data),
-            ref_count: 0,
-            phantom: Default::default()
-        }
-    }
-
-    /// Creates a new context box for the given mutable reference, and sets its reference count to 0.
-    ///
-    /// This is the only place where WrappedPointer is created.
-    /// It guarantees that the wrapped raw pointer is valid within 'i.
-    fn new_mut<T: 'static>(data_ref: &'i mut T) -> Self {
-        Self {
-            data: Box::new(WrappedPointer(data_ref as *mut T)),
-            ref_count: 0,
-            phantom: Default::default()
-        }
-    }
-
-    /// Increments the context's reference count.
-    fn increment(&mut self) {
-        self.ref_count += 1;
-    }
-
-    /// Decrements the context's reference count.  Returns true if the count is now 0,
-    /// and false otherwise.
-    ///
-    /// Panics if the count is already 0.
-    fn decrement(&mut self) -> bool {
-        assert!(
-            self.ref_count != 0,
-            "attempted to decrement context ref count below zero"
-        );
-        self.ref_count -= 1;
-        self.ref_count == 0
-    }
-
-    /// Get a mutable reference.
-    fn get_mut<'j, T: 'static>(&'j mut self) -> &'j mut T where 'i: 'j {
-        if let Some(ret_mut) = self.data.downcast_mut::<WrappedPointer<*mut T>>() {
-            // safety guaranteed 
-            return unsafe { &mut *ret_mut.0 }
-        }
-        if let Some(ret) = self.data.downcast_mut::<T>() {
-            return ret;
-        }
-        panic!("context type mismatch")
-    }
+  }
 }
 
+#[derive(Debug, Clone, Copy)]
 struct ProfileRecord {
     count: u128,
     nanos: u128,
@@ -657,12 +619,7 @@ impl ProfileRecord {
     }
 }
 
-// NOTE: The order of methods in the generated RustDoc depends on the order in this block.
-// Consequently, methods are ordered pedagogically.
-impl<'i> Interp<'i> {
-    //--------------------------------------------------------------------------------------------
-    // Constructors
-
+impl Interp<()> {
     /// Creates a new Molt interpreter with no commands defined.  Use this when crafting
     /// command languages that shouldn't include the normal TCL commands, or as a base
     /// to which specific Molt command sets can be added.
@@ -670,27 +627,47 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// # use molt_ng::interp::Interp;
-    /// let mut interp = Interp::empty();
-    /// assert!(interp.command_names().is_empty());
+    /// # use molt::interp::Interp;
+    /// let mut interp = Interp::default(());
     /// ```
-
-    pub fn empty() -> Self {
-        let mut interp = Self {
-            recursion_limit: 1000,
-            commands: HashMap::new(),
-            last_context_id: 0,
-            context_map: HashMap::new(),
-            scopes: ScopeStack::new(),
-            num_levels: 0,
-            profile_map: HashMap::new(),
-            continue_on_error: false,
-        };
-
-        interp.set_scalar("errorInfo", Value::empty()).unwrap();
-        interp
+    pub fn default() -> Self {
+        use crate::prelude::*;
+        let command = gen_command!(
+            (),
+            // native commands
+            [
+                // TODO: Requires file access.  Ultimately, might go in an extension crate if
+                // the necessary operations aren't available in core::).
+                (_SOURCE, cmd_source),
+                // TODO: Useful for entire programs written in Molt; but not necessarily wanted in
+                // extension scripts).
+                (_EXIT, cmd_exit),
+                // TODO: Developer Tools
+                (_PARSE, cmd_parse),
+                (_PDUMP, cmd_pdump),
+                (_PCLEAR, cmd_pclear)
+            ],
+            // embedded commands
+            []
+        );
+        Interp::new((), command, true)
     }
+}
 
+// NOTE: The order of methods in the generated RustDoc depends on the order in this block.
+// Consequently, methods are ordered pedagogically.
+impl<Ctx> Interp<Ctx>
+where
+    Ctx: 'static,
+{
+    #[inline]
+    pub fn contains_proc(&self, proc_name: &str) -> bool {
+        self.procs.contains_key(proc_name)
+    }
+    #[inline]
+    pub fn get_proc(&self, proc_name: &str) -> Option<&Rc<Procedure>> {
+        self.procs.get(proc_name)
+    }
     /// Creates a new Molt interpreter that is pre-populated with the standard Molt commands.
     /// Use [`command_names`](#method.command_names) (or the `info commands` Molt command)
     /// to retrieve the full list, and the [`add_command`](#method.add_command) family of
@@ -700,73 +677,53 @@ impl<'i> Interp<'i> {
     /// add or remove them in groups).
     ///
     /// ```
-    /// # use molt_ng::types::*;
-    /// # use molt_ng::Interp;
-    /// # use molt_ng::molt_ok;
+    /// # use molt::types::*;
+    /// # use molt::Interp;
+    /// # use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     /// let four = interp.eval("expr {2 + 2}")?;
     /// assert_eq!(four, Value::from(4));
     /// # molt_ok!()
     /// # }
     /// ```
     ///
-    pub fn new() -> Self {
-        let mut interp = Interp::empty();
+    #[inline]
+    pub fn new(context: Ctx, command: Command<Ctx>, use_env: bool) -> Self {
+        cfg_if::cfg_if! {
+          if #[cfg(feature = "wasm")] {
+            let mut interp = Self {
+              command,
+              recursion_limit: 1000,
+              procs: HashMap::new(),
+              context,
+              std_buff: Vec::new(),
+              scopes: ScopeStack::new(),
+              num_levels: 0,
+              profile_map: HashMap::new(),
+              continue_on_error: false,
+            };
+          } else {
+            let mut interp = Self {
+              recursion_limit: 1000,
+              command,
+              procs: HashMap::new(),
+              context,
+              scopes: ScopeStack::new(),
+              num_levels: 0,
+              profile_map: HashMap::new(),
+              continue_on_error: false,
+            };
+          }
+        }
 
-        // TODO: These commands affect the interpreter only, not the external environment.
-        // It might be desirable to subdivide them further, into those that can cause
-        // denial-of-service kinds of problems, e.g., for, while, proc, rename, and those
-        // that can't.
-        interp.add_command("append", commands::cmd_append);
-        interp.add_command("array", commands::cmd_array);
-        interp.add_command("assert_eq", commands::cmd_assert_eq);
-        interp.add_command("break", commands::cmd_break);
-        interp.add_command("catch", commands::cmd_catch);
-        interp.add_command("continue", commands::cmd_continue);
-        interp.add_command("dict", commands::cmd_dict);
-        interp.add_command("error", commands::cmd_error);
-        interp.add_command("expr", commands::cmd_expr);
-        interp.add_command("for", commands::cmd_for);
-        interp.add_command("foreach", commands::cmd_foreach);
-        interp.add_command("global", commands::cmd_global);
-        interp.add_command("if", commands::cmd_if);
-        interp.add_command("incr", commands::cmd_incr);
-        interp.add_command("info", commands::cmd_info);
-        interp.add_command("join", commands::cmd_join);
-        interp.add_command("lappend", commands::cmd_lappend);
-        interp.add_command("lindex", commands::cmd_lindex);
-        interp.add_command("list", commands::cmd_list);
-        interp.add_command("llength", commands::cmd_llength);
-        interp.add_command("proc", commands::cmd_proc);
-        interp.add_command("puts", commands::cmd_puts);
-        interp.add_command("rename", commands::cmd_rename);
-        interp.add_command("return", commands::cmd_return);
-        interp.add_command("set", commands::cmd_set);
-        interp.add_command("string", commands::cmd_string);
-        interp.add_command("throw", commands::cmd_throw);
-        interp.add_command("time", commands::cmd_time);
-        interp.add_command("unset", commands::cmd_unset);
-        interp.add_command("while", commands::cmd_while);
-
-        // TODO: Requires file access.  Ultimately, might go in an extension crate if
-        // the necessary operations aren't available in core::.
-        interp.add_command("source", commands::cmd_source);
-
-        // TODO: Useful for entire programs written in Molt; but not necessarily wanted in
-        // extension scripts.
-        interp.add_command("exit", commands::cmd_exit);
-
-        // TODO: Developer Tools
-        interp.add_command("parse", parser::cmd_parse);
-        interp.add_command("pdump", commands::cmd_pdump);
-        interp.add_command("pclear", commands::cmd_pclear);
-
-        // Populate the environment variable.
-        // TODO: Really should be a "linked" variable, where sets to it are tracked and
-        // written back to the environment.
-        interp.populate_env();
-
+        interp.set_scalar("errorInfo", Value::empty()).unwrap();
+        if use_env {
+            // Populate the environment variable.
+            // TODO: Really should be a "linked" variable, where sets to it are tracked and
+            // written back to the environment.
+            interp.populate_env();
+        }
         interp
     }
 
@@ -775,6 +732,7 @@ impl<'i> Interp<'i> {
     /// # TCL Liens
     ///
     /// Changes to the variable are not mirrored back into the process's environment.
+    #[inline]
     fn populate_env(&mut self) {
         for (key, value) in std::env::vars() {
             // Drop the result, as there's no good reason for this to ever throw an error.
@@ -801,10 +759,10 @@ impl<'i> Interp<'i> {
     /// it's a computed `Value` or an error message (which is also a `Value`).
     ///
     /// ```
-    /// # use molt_ng::types::*;
-    /// # use molt_ng::Interp;
+    /// # use molt::types::*;
+    /// # use molt::Interp;
     ///
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// let input = "set a 1";
     ///
@@ -824,7 +782,7 @@ impl<'i> Interp<'i> {
     ///    }
     /// }
     /// ```
-
+    #[inline]
     pub fn eval(&mut self, script: &str) -> MoltResult {
         let value = Value::from(script);
         self.eval_value(&value)
@@ -842,6 +800,7 @@ impl<'i> Interp<'i> {
     /// times.
     ///
     /// [`Value`]: ../value/index.html
+    #[inline]
     pub fn eval_value(&mut self, value: &Value) -> MoltResult {
         // TODO: Could probably do better, here.  If the value is already a list, for
         // example, can maybe evaluate it as a command without using as_script().
@@ -875,7 +834,9 @@ impl<'i> Interp<'i> {
                     ResultCode::Error => Err(exception),
                     ResultCode::Return => Err(exception), // -level > 0
                     ResultCode::Break => molt_err!("invoked \"break\" outside of a loop"),
-                    ResultCode::Continue => molt_err!("invoked \"continue\" outside of a loop"),
+                    ResultCode::Continue => {
+                        molt_err!("invoked \"continue\" outside of a loop")
+                    }
                     // TODO: Better error message
                     ResultCode::Other(_) => molt_err!("unexpected result code."),
                 };
@@ -892,7 +853,11 @@ impl<'i> Interp<'i> {
     }
 
     /// Saves the error exception data
-    fn set_global_error_data(&mut self, error_data: Option<&ErrorData>) -> Result<(), Exception> {
+    #[inline]
+    fn set_global_error_data(
+        &mut self,
+        error_data: Option<&ErrorData>,
+    ) -> Result<(), Exception> {
         if let Some(data) = error_data {
             // TODO: Might want a public method for this.  Or, if I implement namespaces, that's
             // sufficient.
@@ -923,12 +888,16 @@ impl<'i> Interp<'i> {
                             // this intermediate error is going to be overwritten.
                             // (due to `continue_on_error` being set).
                             // we log it before heading over to next command.
-                            clilog::error!(TCL_ERR, "{}", e.error_info());
+                            cfg_if::cfg_if! {
+                              if #[cfg(feature = "wasm")] {
+                                self.std_buff.push(Err(e.clone()));
+                              }
+                            }
                         }
                         result_value = Err(e);
                         continue;
                     }
-                    return Err(e)
+                    return Err(e);
                 }
             };
 
@@ -942,66 +911,71 @@ impl<'i> Interp<'i> {
                 // this intermediate error is going to be overwritten.
                 // (due to `continue_on_error` being set).
                 // we log it before heading over to next command.
-                clilog::error!(TCL_ERR, "{}", e.error_info());
+                cfg_if::cfg_if! {
+                  if #[cfg(feature = "wasm")] {
+                    self.std_buff.push(Err(e.clone()));
+                  }
+                }
             }
 
-            if let Some(cmd) = self.commands.get(name) {
-                // let start = Instant::now();
-                let cmd = Rc::clone(cmd);
-                let result = cmd.execute(self, words.as_slice());
-                // self.profile_save(&format!("cmd.execute({})", name), start);
+            // if let Some(cmd) = self.commands.get(name) {
+            // let start = Instant::now();
+            let result = (self.command.fn_execute)(name, self, words.as_slice());
+            // self.profile_save(&format!("cmd.execute({})", name), start);
 
-                if let Ok(v) = result {
-                    result_value = Ok(v);
-                } else if let Err(mut exception) = result {
-                    // TODO: I think this needs to be done up above.
-                    // // Handle the return -code, -level protocol
-                    // if exception.code() == ResultCode::Return {
-                    //     exception.decrement_level();
-                    // }
+            if let Ok(v) = result {
+                result_value = Ok(v);
+            } else if let Err(mut exception) = result {
+                // TODO: I think this needs to be done up above.
+                // // Handle the return -code, -level protocol
+                // if exception.code() == ResultCode::Return {
+                //     exception.decrement_level();
+                // }
 
-                    match exception.code() {
-                        // ResultCode::Okay => result_value = exception.value(),
-                        ResultCode::Error => {
-                            // FIRST, new error, an error from within a proc, or an error from
-                            // within some other body (ignored).
-                            if exception.is_new_error() {
-                                exception.add_error_info("    while executing");
-                                // TODO: Add command.  In standard TCL, this is the text of the command
-                                // before interpolation; at present, we don't have that info in a
-                                // convenient form.  For now, just convert the final words to a string.
-                                exception.add_error_info(&format!("\"{}\"", &list_to_string(&words)));
-                            } else if cmd.is_proc() {
-                                exception.add_error_info("    invoked from within");
-                                exception.add_error_info(&format!(
-                                    "    (procedure \"{}\" line TODO)",
-                                    name
-                                ));
-                                // TODO: same as above.
-                                exception.add_error_info(&format!("\"{}\"", &list_to_string(&words)));
-                            }
-                        },
-                        // return, continue, break, and custom logic
-                        // always exit the script and
-                        // are not affected by the error flag.
-                        _ => return Err(exception)
+                match exception.code() {
+                    // ResultCode::Okay => result_value = exception.value(),
+                    ResultCode::Error => {
+                        // FIRST, new error, an error from within a proc, or an error from
+                        // within some other body (ignored).
+                        if exception.is_new_error() {
+                            exception.add_error_info("    while executing");
+                            // TODO: Add command.  In standard TCL, this is the text of the command
+                            // before interpolation; at present, we don't have that info in a
+                            // convenient form.  For now, just convert the final words to a string.
+                            exception.add_error_info(&format!(
+                                "\"{}\"",
+                                &list_to_string(&words)
+                            ));
+                        }
+                        // else if cmd.is_proc() {
+                        //   exception.add_error_info("    invoked from within");
+                        //   exception
+                        //     .add_error_info(&format!("    (procedure \"{}\" line TODO)", name));
+                        //   // TODO: same as above.
+                        //   exception.add_error_info(&format!("\"{}\"", &list_to_string(&words)));
+                        // }
                     }
-                    if !self.continue_on_error {
-                        return Err(exception)
-                    } else {
-                        result_value = Err(exception);
-                    }
+                    // return, continue, break, and custom logic
+                    // always exit the script and
+                    // are not affected by the error flag.
+                    _ => return Err(exception),
+                }
+                if !self.continue_on_error {
+                    return Err(exception);
                 } else {
-                    unreachable!();
+                    result_value = Err(exception);
                 }
             } else {
-                let err = molt_err!("invalid command name \"{}\"", name);
-                if !self.continue_on_error {
-                    return err
-                } else {
-                    result_value = err;
-                }
+                unreachable!();
             }
+            // } else {
+            //   let err = molt_err!("invalid command name \"{}\"", name);
+            //   if !self.continue_on_error {
+            //     return err;
+            //   } else {
+            //     result_value = err;
+            //   }
+            // }
         }
 
         result_value
@@ -1009,6 +983,7 @@ impl<'i> Interp<'i> {
 
     /// Evaluates a WordVec, producing a list of Values.  The expansion operator is handled
     /// as a special case.
+    #[inline]
     fn eval_word_vec(&mut self, words: &[Word]) -> Result<MoltList, Exception> {
         let mut list: MoltList = Vec::new();
 
@@ -1027,6 +1002,7 @@ impl<'i> Interp<'i> {
     }
 
     /// Evaluates a single word, producing a value.  This is also used by expr.rs.
+    #[inline]
     pub(crate) fn eval_word(&mut self, word: &Word) -> MoltResult {
         match word {
             Word::Value(val) => Ok(val.clone()),
@@ -1061,14 +1037,18 @@ impl<'i> Interp<'i> {
                 match exception.code() {
                     ResultCode::Okay => unreachable!(), // TODO: Not in use yet
                     ResultCode::Error => {
-                        let data = exception.error_data().expect("Error has no error data");
+                        let data =
+                            exception.error_data().expect("Error has no error data");
                         opts.insert(OPT_CODE.into(), "1".into());
                         opts.insert(OPT_ERRORCODE.into(), data.error_code());
                         opts.insert(OPT_ERRORINFO.into(), data.error_info());
                         // TODO: Standard TCL also sets -errorstack, -errorline.
                     }
                     ResultCode::Return => {
-                        opts.insert(OPT_CODE.into(), exception.next_code().as_int().into());
+                        opts.insert(
+                            OPT_CODE.into(),
+                            exception.next_code().as_int().into(),
+                        );
                         if let Some(data) = exception.error_data() {
                             opts.insert(OPT_ERRORCODE.into(), data.error_code());
                             opts.insert(OPT_ERRORINFO.into(), data.error_info());
@@ -1102,13 +1082,13 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// # use molt_ng::types::*;
-    /// # use molt_ng::interp::Interp;
-    /// let mut interp = Interp::new();
+    /// # use molt::types::*;
+    /// # use molt::interp::Interp;
+    /// let mut interp = Interp::default();
     /// assert!(interp.complete("set a [expr {1+1}]"));
     /// assert!(!interp.complete("set a [expr {1+1"));
     /// ```
-
+    #[inline]
     pub fn complete(&mut self, script: &str) -> bool {
         parser::parse(script).is_ok()
     }
@@ -1119,10 +1099,10 @@ impl<'i> Interp<'i> {
     ///
     /// # Example
     /// ```
-    /// use molt_ng::Interp;
-    /// use molt_ng::types::*;
+    /// use molt::Interp;
+    /// use molt::types::*;
     /// # fn dummy() -> Result<String,Exception> {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     /// let expr = Value::from("2 + 2");
     /// let sum = interp.expr(&expr)?.as_int()?;
     ///
@@ -1130,6 +1110,7 @@ impl<'i> Interp<'i> {
     /// # Ok("dummy".to_string())
     /// # }
     /// ```
+    #[inline]
     pub fn expr(&mut self, expr: &Value) -> MoltResult {
         // Evaluate the expression and set the errorInfo/errorCode.
         let result = expr::expr(self, expr);
@@ -1147,10 +1128,10 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::Interp;
-    /// use molt_ng::types::*;
+    /// use molt::Interp;
+    /// use molt::types::*;
     /// # fn dummy() -> Result<String,Exception> {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// let expr = Value::from("1 < 2");
     /// let flag: bool = interp.expr_bool(&expr)?;
@@ -1159,6 +1140,7 @@ impl<'i> Interp<'i> {
     /// # Ok("dummy".to_string())
     /// # }
     /// ```
+    #[inline]
     pub fn expr_bool(&mut self, expr: &Value) -> Result<bool, Exception> {
         self.expr(expr)?.as_bool()
     }
@@ -1170,10 +1152,10 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::Interp;
-    /// use molt_ng::types::*;
+    /// use molt::Interp;
+    /// use molt::types::*;
     /// # fn dummy() -> Result<String,Exception> {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// let expr = Value::from("1 + 2");
     /// let val: MoltInt = interp.expr_int(&expr)?;
@@ -1182,6 +1164,7 @@ impl<'i> Interp<'i> {
     /// # Ok("dummy".to_string())
     /// # }
     /// ```
+    #[inline]
     pub fn expr_int(&mut self, expr: &Value) -> Result<MoltInt, Exception> {
         self.expr(expr)?.as_int()
     }
@@ -1193,10 +1176,10 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::Interp;
-    /// use molt_ng::types::*;
+    /// use molt::Interp;
+    /// use molt::types::*;
     /// # fn dummy() -> Result<String,Exception> {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// let expr = Value::from("1.1 + 2.2");
     /// let val: MoltFloat = interp.expr_float(&expr)?;
@@ -1205,6 +1188,7 @@ impl<'i> Interp<'i> {
     /// # Ok("dummy".to_string())
     /// # }
     /// ```
+    #[inline]
     pub fn expr_float(&mut self, expr: &Value) -> Result<MoltFloat, Exception> {
         self.expr(expr)?.as_float()
     }
@@ -1222,11 +1206,11 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::Interp;
-    /// use molt_ng::molt_ok;
+    /// use molt::types::*;
+    /// use molt::Interp;
+    /// use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// // Set the value of the scalar variable "a" using a script.
     /// interp.eval("set a 1")?;
@@ -1244,6 +1228,7 @@ impl<'i> Interp<'i> {
     /// # molt_ok!()
     /// # }
     /// ```
+    #[inline]
     pub fn var(&self, var_name: &Value) -> MoltResult {
         let var_name = &*var_name.as_var_name();
         match var_name.index() {
@@ -1253,6 +1238,7 @@ impl<'i> Interp<'i> {
     }
 
     /// Returns 1 if the named variable is defined and exists, and 0 otherwise.
+    #[inline]
     pub fn var_exists(&self, var_name: &Value) -> bool {
         let var_name = &*var_name.as_var_name();
         match var_name.index() {
@@ -1271,11 +1257,11 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::Interp;
-    /// use molt_ng::molt_ok;
+    /// use molt::types::*;
+    /// use molt::Interp;
+    /// use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// // Set the value of the scalar variable "a"
     /// let scalar = Value::from("a");  // The variable name
@@ -1289,6 +1275,7 @@ impl<'i> Interp<'i> {
     /// # molt_ok!()
     /// # }
     /// ```
+    #[inline]
     pub fn set_var(&mut self, var_name: &Value, value: Value) -> Result<(), Exception> {
         let var_name = &*var_name.as_var_name();
         match var_name.index() {
@@ -1309,11 +1296,11 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::Interp;
-    /// use molt_ng::molt_ok;
+    /// use molt::types::*;
+    /// use molt::Interp;
+    /// use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// // Set the value of the scalar variable "a"
     /// let scalar = Value::from("a");  // The variable name
@@ -1326,6 +1313,7 @@ impl<'i> Interp<'i> {
     /// # molt_ok!()
     /// # }
     /// ```
+    #[inline]
     pub fn set_var_return(&mut self, var_name: &Value, value: Value) -> MoltResult {
         let var_name = &*var_name.as_var_name();
         match var_name.index() {
@@ -1341,11 +1329,11 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::Interp;
-    /// use molt_ng::molt_ok;
+    /// use molt::types::*;
+    /// use molt::Interp;
+    /// use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// // Set the value of the scalar variable "a" using a script.
     /// interp.eval("set a 1")?;
@@ -1356,6 +1344,7 @@ impl<'i> Interp<'i> {
     /// # molt_ok!()
     /// # }
     /// ```
+    #[inline]
     pub fn scalar(&self, name: &str) -> MoltResult {
         self.scopes.get(name)
     }
@@ -1368,11 +1357,11 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::Interp;
-    /// use molt_ng::molt_ok;
+    /// use molt::types::*;
+    /// use molt::Interp;
+    /// use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// // Set the value of the scalar variable "a"
     /// interp.set_scalar("a", Value::from("1"))?;
@@ -1380,6 +1369,7 @@ impl<'i> Interp<'i> {
     /// # molt_ok!()
     /// # }
     /// ```
+    #[inline]
     pub fn set_scalar(&mut self, name: &str, value: Value) -> Result<(), Exception> {
         self.scopes.set(name, value)
     }
@@ -1392,16 +1382,17 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::Interp;
-    /// use molt_ng::molt_ok;
+    /// use molt::types::*;
+    /// use molt::Interp;
+    /// use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// // Set the value of the scalar variable "a"
     /// assert_eq!(interp.set_scalar_return("a", Value::from("1"))?.as_str(), "1");
     /// # molt_ok!()
     /// # }
+    #[inline]
     pub fn set_scalar_return(&mut self, name: &str, value: Value) -> MoltResult {
         // Clone the value, since we'll be returning it out again.
         self.scopes.set(name, value.clone())?;
@@ -1416,11 +1407,11 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::Interp;
-    /// use molt_ng::molt_ok;
+    /// use molt::types::*;
+    /// use molt::Interp;
+    /// use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// // Set the value of the array element variable "a(1)" using a script.
     /// interp.eval("set a(1) Howdy")?;
@@ -1431,6 +1422,7 @@ impl<'i> Interp<'i> {
     /// # molt_ok!()
     /// # }
     /// ```
+    #[inline]
     pub fn element(&self, name: &str, index: &str) -> MoltResult {
         self.scopes.get_elem(name, index)
     }
@@ -1443,11 +1435,11 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::Interp;
-    /// use molt_ng::molt_ok;
+    /// use molt::types::*;
+    /// use molt::Interp;
+    /// use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// // Set the value of the scalar variable "a"
     /// interp.set_element("b", "1", Value::from("xyz"))?;
@@ -1455,7 +1447,13 @@ impl<'i> Interp<'i> {
     /// # molt_ok!()
     /// # }
     /// ```
-    pub fn set_element(&mut self, name: &str, index: &str, value: Value) -> Result<(), Exception> {
+    #[inline]
+    pub fn set_element(
+        &mut self,
+        name: &str,
+        index: &str,
+        value: Value,
+    ) -> Result<(), Exception> {
         self.scopes.set_elem(name, index, value)
     }
 
@@ -1467,18 +1465,24 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::Interp;
-    /// use molt_ng::molt_ok;
+    /// use molt::types::*;
+    /// use molt::Interp;
+    /// use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// // Set the value of the scalar variable "a"
     /// assert_eq!(interp.set_element_return("b", "1", Value::from("xyz"))?.as_str(), "xyz");
     /// # molt_ok!()
     /// # }
     /// ```
-    pub fn set_element_return(&mut self, name: &str, index: &str, value: Value) -> MoltResult {
+    #[inline]
+    pub fn set_element_return(
+        &mut self,
+        name: &str,
+        index: &str,
+        value: Value,
+    ) -> MoltResult {
         // Clone the value, since we'll be returning it out again.
         self.scopes.set_elem(name, index, value.clone())?;
         Ok(value)
@@ -1493,11 +1497,11 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::Interp;
-    /// use molt_ng::molt_ok;
+    /// use molt::types::*;
+    /// use molt::Interp;
+    /// use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// interp.set_scalar("a", Value::from("1"))?;
     /// interp.set_element("b", "1", Value::from("2"))?;
@@ -1507,6 +1511,7 @@ impl<'i> Interp<'i> {
     /// # molt_ok!()
     /// # }
     /// ```
+    #[inline]
     pub fn unset(&mut self, name: &str) {
         self.scopes.unset(name);
     }
@@ -1518,11 +1523,11 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::Interp;
-    /// use molt_ng::molt_ok;
+    /// use molt::types::*;
+    /// use molt::Interp;
+    /// use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// let scalar = Value::from("a");
     /// let array = Value::from("b");
@@ -1534,6 +1539,7 @@ impl<'i> Interp<'i> {
     /// # molt_ok!()
     /// # }
     /// ```
+    #[inline]
     pub fn unset_var(&mut self, name: &Value) {
         let var_name = name.as_var_name();
 
@@ -1551,11 +1557,11 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::Interp;
-    /// use molt_ng::molt_ok;
+    /// use molt::types::*;
+    /// use molt::Interp;
+    /// use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// interp.set_element("b", "1", Value::from("2"))?;
     ///
@@ -1563,6 +1569,7 @@ impl<'i> Interp<'i> {
     /// # molt_ok!()
     /// # }
     /// ```
+    #[inline]
     pub fn unset_element(&mut self, array_name: &str, index: &str) {
         self.scopes.unset_element(array_name, index);
     }
@@ -1573,14 +1580,15 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::Interp;
-    /// use molt_ng::types::*;
+    /// use molt::Interp;
+    /// use molt::types::*;
     ///
-    /// # let mut interp = Interp::new();
+    /// # let mut interp = Interp::default();
     /// for name in interp.vars_in_scope() {
     ///     println!("Found variable: {}", name);
     /// }
     /// ```
+    #[inline]
     pub fn vars_in_scope(&self) -> MoltList {
         self.scopes.vars_in_scope()
     }
@@ -1591,14 +1599,15 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::Interp;
-    /// use molt_ng::types::*;
+    /// use molt::Interp;
+    /// use molt::types::*;
     ///
-    /// # let mut interp = Interp::new();
+    /// # let mut interp = Interp::default();
     /// for name in interp.vars_in_global_scope() {
     ///     println!("Found variable: {}", name);
     /// }
     /// ```
+    #[inline]
     pub fn vars_in_global_scope(&self) -> MoltList {
         self.scopes.vars_in_global_scope()
     }
@@ -1611,14 +1620,15 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::Interp;
-    /// use molt_ng::types::*;
+    /// use molt::Interp;
+    /// use molt::types::*;
     ///
-    /// # let mut interp = Interp::new();
+    /// # let mut interp = Interp::default();
     /// for name in interp.vars_in_local_scope() {
     ///     println!("Found variable: {}", name);
     /// }
     /// ```
+    #[inline]
     pub fn vars_in_local_scope(&self) -> MoltList {
         self.scopes.vars_in_local_scope()
     }
@@ -1629,6 +1639,7 @@ impl<'i> Interp<'i> {
     ///
     /// This method is used to implement the `upvar` command, which allows variables to be
     /// passed by name; client code should rarely need to access it directly.
+    #[inline]
     pub fn upvar(&mut self, level: usize, name: &str) {
         assert!(level <= self.scopes.current(), "Invalid scope level");
         self.scopes.upvar(level, name);
@@ -1643,12 +1654,14 @@ impl<'i> Interp<'i> {
     ///
     /// **Note:** a command that pushes a scope must also call `Interp::pop_scope` before it
     /// exits!
+    #[inline]
     pub fn push_scope(&mut self) {
         self.scopes.push();
     }
 
     /// Pops a variable scope (i.e., a stack level) off of the scope stack.  Calls to
     /// `Interp::push_scope` and `Interp::pop_scope` must exist in pairs.
+    #[inline]
     pub fn pop_scope(&mut self) {
         self.scopes.pop();
     }
@@ -1657,6 +1670,7 @@ impl<'i> Interp<'i> {
     /// `Interp::push_scope` adds a level, and each call to `Interp::pop_scope` removes it.
     /// This method is used with `Interp::upvar` to access the caller's scope when a variable
     /// is passed by name.
+    #[inline]
     pub fn scope_level(&self) -> usize {
         self.scopes.current()
     }
@@ -1668,6 +1682,7 @@ impl<'i> Interp<'i> {
 
     /// Unsets an array variable givee its name.  Nothing happens if the variable doesn't
     /// exist, or if the variable is not an array variable.
+    #[inline]
     pub(crate) fn array_unset(&mut self, array_name: &str) {
         self.scopes.array_unset(array_name);
     }
@@ -1677,11 +1692,11 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// # use molt_ng::Interp;
-    /// # use molt_ng::types::*;
-    /// # use molt_ng::molt_ok;
+    /// # use molt::Interp;
+    /// # use molt::types::*;
+    /// # use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// # let mut interp = Interp::new();
+    /// # let mut interp = Interp::default();
     /// interp.set_scalar("a", Value::from(1))?;
     /// interp.set_element("b", "1", Value::from(2));
     ///
@@ -1690,6 +1705,7 @@ impl<'i> Interp<'i> {
     /// # molt_ok!()
     /// # }
     /// ```
+    #[inline]
     pub fn array_exists(&self, array_name: &str) -> bool {
         self.scopes.array_exists(array_name)
     }
@@ -1700,14 +1716,15 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::Interp;
-    /// use molt_ng::types::*;
+    /// use molt::Interp;
+    /// use molt::types::*;
     ///
-    /// # let mut interp = Interp::new();
+    /// # let mut interp = Interp::default();
     /// for txt in interp.array_get("myArray") {
     ///     println!("Found index or value: {}", txt);
     /// }
     /// ```
+    #[inline]
     pub fn array_get(&self, array_name: &str) -> MoltList {
         self.scopes.array_get(array_name)
     }
@@ -1730,16 +1747,17 @@ impl<'i> Interp<'i> {
     /// ```
     ///
     /// ```
-    /// use molt_ng::Interp;
-    /// use molt_ng::types::*;
-    /// # use molt_ng::molt_ok;
+    /// use molt::Interp;
+    /// use molt::types::*;
+    /// # use molt::molt_ok;
     ///
     /// # fn dummy() -> MoltResult {
-    /// # let mut interp = Interp::new();
+    /// # let mut interp = Interp::default();
     /// interp.array_set("myArray", &vec!["a".into(), "1".into(), "b".into(), "2".into()])?;
     /// # molt_ok!()
     /// # }
     /// ```
+    #[inline]
     pub fn array_set(&mut self, array_name: &str, kvlist: &[Value]) -> MoltResult {
         if kvlist.len() % 2 == 0 {
             self.scopes.array_set(array_name, kvlist)?;
@@ -1756,14 +1774,15 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::Interp;
-    /// use molt_ng::types::*;
+    /// use molt::Interp;
+    /// use molt::types::*;
     ///
-    /// # let mut interp = Interp::new();
+    /// # let mut interp = Interp::default();
     /// for name in interp.array_names("myArray") {
     ///     println!("Found index : {}", name);
     /// }
     /// ```
+    #[inline]
     pub fn array_names(&self, array_name: &str) -> MoltList {
         self.scopes.array_indices(array_name)
     }
@@ -1774,12 +1793,12 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::Interp;
-    /// use molt_ng::types::*;
+    /// use molt::Interp;
+    /// use molt::types::*;
     ///
-    /// # use molt_ng::molt_ok;
+    /// # use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// assert_eq!(interp.array_size("a"), 0);
     ///
@@ -1788,38 +1807,29 @@ impl<'i> Interp<'i> {
     /// # molt_ok!()
     /// # }
     /// ```
+    #[inline]
     pub fn array_size(&self, array_name: &str) -> usize {
         self.scopes.array_size(array_name)
     }
 
-    //--------------------------------------------------------------------------------------------
-    // Command Definition and Handling
+    // //--------------------------------------------------------------------------------------------
+    // // Command Definition and Handling
 
-    /// Adds a binary command with no related context to the interpreter.  This is the normal
-    /// way to add most commands.
-    ///
-    /// If the command needs access to some form of application or context data,
-    /// use [`add_context_command`](#method.add_context_command) instead.  See the
-    /// [module level documentation](index.html) for an overview and examples.
-    pub fn add_command(&mut self, name: &str, func: CommandFunc) {
-        self.add_context_command(name, func, &[]);
-    }
-
-    /// Adds a binary command with related context data to the interpreter.
-    ///
-    /// This is the normal way to add commands requiring application context.  See the
-    /// [module level documentation](index.html) for an overview and examples.
-    pub fn add_context_command(&mut self, name: &str, func: CommandFunc, context_ids: &[ContextID]) {
-        for context_id in context_ids {
-            self.context_map
-                .get_mut(context_id)
-                .expect("unknown context ID")
-                .increment();
-        }
-
-        self.commands
-            .insert(name.into(), Rc::new(Command::Native(func, context_ids.iter().copied().collect())));
-    }
+    // /// Adds a binary command with no related context to the interpreter.  This is the normal
+    // /// way to add most commands.
+    // ///
+    // /// If the command needs access to some form of application or context data,
+    // /// use [`add_context_command`](#method.add_context_command) instead.  See the
+    // /// [module level documentation](index.html) for an overview and examples.
+    // pub fn add_command(
+    //   &mut self,
+    //   name: &str,
+    //   func: impl Fn(&mut Interp<Ctx>, &[Value]) -> MoltResult + 'static,
+    // ) {
+    //   self
+    //     .commands
+    //     .insert(name.into(), Rc::new(Command::Native(Box::new(func))));
+    // }
 
     /// Adds a procedure to the interpreter.
     ///
@@ -1828,20 +1838,19 @@ impl<'i> Interp<'i> {
     ///
     /// TODO: If this method is ever made public, the parameter list validation done
     /// in cmd_proc should be moved here.
+    #[inline]
     pub(crate) fn add_proc(&mut self, name: &str, parms: &[Value], body: &Value) {
-        let proc = Procedure {
-            parms: parms.to_owned(),
-            body: body.clone(),
-        };
-
-        self.commands
-            .insert(name.into(), Rc::new(Command::Proc(proc)));
+        self.procs.insert(
+            name.into(),
+            Rc::new(Procedure { parms: parms.to_owned(), body: body.clone() }),
+        );
     }
 
     /// Determines whether or not the interpreter contains a command with the given
     /// name.
-    pub fn has_command(&self, name: &str) -> bool {
-        self.commands.contains_key(name)
+    #[inline]
+    pub fn has_proc(&self, name: &str) -> bool {
+        self.procs.contains_key(name)
     }
 
     /// Renames the command.
@@ -1854,11 +1863,11 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::Interp;
-    /// use molt_ng::types::*;
-    /// use molt_ng::molt_ok;
+    /// use molt::Interp;
+    /// use molt::types::*;
+    /// use molt::molt_ok;
     /// # fn dummy() -> MoltResult {
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// interp.rename_command("expr", "=");
     ///
@@ -1868,11 +1877,10 @@ impl<'i> Interp<'i> {
     /// # molt_ok!()
     /// # }
     /// ```
-    pub fn rename_command(&mut self, old_name: &str, new_name: &str) {
-        if let Some(cmd) = self.commands.get(old_name) {
-            let cmd = Rc::clone(cmd);
-            self.commands.remove(old_name);
-            self.commands.insert(new_name.into(), cmd);
+    #[inline]
+    pub fn rename_proc(&mut self, old_name: &str, new_name: &str) {
+        if let Some(proc) = self.procs.remove(old_name) {
+            self.procs.insert(new_name.into(), proc);
         }
     }
 
@@ -1883,39 +1891,36 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::Interp;
-    /// use molt_ng::types::*;
-    /// use molt_ng::molt_ok;
+    /// use molt::Interp;
+    /// use molt::types::*;
+    /// use molt::molt_ok;
     ///
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// interp.remove_command("set");  // You'll be sorry....
     ///
     /// assert!(!interp.has_command("set"));
     /// ```
-    pub fn remove_command(&mut self, name: &str) {
-        // FIRST, get the command's context ID, if any.
-        let context_ids = self
-            .commands
-            .get(name)
-            .expect("undefined command")
-            .context_ids();
+    #[inline]
+    pub fn remove_proc(&mut self, name: &str) {
+        // // FIRST, get the command's context ID, if any.
+        // let context_ids = self.commands.get(name).expect("undefined command").context_ids();
 
         // NEXT, If it has a non-empty context ID slice, decrement their references count; and if the reference
         // is zero, remove the context.
-        for context_id in context_ids {
-            if self
-                .context_map
-                .get_mut(context_id)
-                .expect("unknown context ID")
-                .decrement()
-            {
-                self.context_map.remove(context_id);
-            }
-        }
+        // for context_id in context_ids {
+        //   if self
+        //     .context_map
+        //     .get_mut(context_id)
+        //     .expect("unknown context ID")
+        //     .decrement()
+        //   {
+        //     self.context_map.remove(context_id);
+        //   }
+        // }
 
         // FINALLY, remove the command itself.
-        self.commands.remove(name);
+        self.procs.remove(name);
     }
 
     /// Gets a vector of the names of the existing commands.
@@ -1923,34 +1928,33 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::Interp;
-    /// use molt_ng::types::*;
-    /// use molt_ng::molt_ok;
+    /// use molt::Interp;
+    /// use molt::types::*;
+    /// use molt::molt_ok;
     ///
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// for name in interp.command_names() {
     ///     println!("Found command: {}", name);
     /// }
     /// ```
     pub fn command_names(&self) -> MoltList {
-        let vec: MoltList = self
-            .commands
-            .keys()
-            .cloned()
-            .map(|x| Value::from(&x))
-            .collect();
-
+        let mut vec: MoltList =
+            self.command.native_names.iter().map(|&s| Value::from(s)).collect();
+        vec.extend(self.command.embedded_names.iter().map(|&s| Value::from(s)));
+        vec.extend(self.procs.keys().map(Value::from));
         vec
     }
 
     /// Returns the body of the named procedure, or an error if the name doesn't
     /// name a procedure.
-    pub fn command_type(&self, command: &str) -> MoltResult {
-        if let Some(cmd) = self.commands.get(command) {
-            molt_ok!(cmd.cmdtype())
-        } else {
-            molt_err!("\"{}\" isn't a command", command)
+    #[inline]
+    pub fn command_type(&self, cmd_name: &str) -> MoltResult {
+        match (self.command.fn_type)(cmd_name, self) {
+            Some(CommandType::Native) => molt_ok!("native"),
+            Some(CommandType::Proc) => molt_ok!("proc"),
+            Some(CommandType::Embedded) => molt_ok!("embedded"),
+            None => molt_err!("\"{}\" isn't a command", cmd_name),
         }
     }
 
@@ -1959,34 +1963,29 @@ impl<'i> Interp<'i> {
     /// # Example
     ///
     /// ```
-    /// use molt_ng::Interp;
-    /// use molt_ng::types::*;
-    /// use molt_ng::molt_ok;
+    /// use molt::Interp;
+    /// use molt::types::*;
+    /// use molt::molt_ok;
     ///
-    /// let mut interp = Interp::new();
+    /// let mut interp = Interp::default();
     ///
     /// for name in interp.proc_names() {
     ///     println!("Found procedure: {}", name);
     /// }
     /// ```
+    #[inline]
     pub fn proc_names(&self) -> MoltList {
-        let vec: MoltList = self
-            .commands
-            .iter()
-            .filter(|(_, cmd)| cmd.is_proc())
-            .map(|(name, _)| Value::from(name))
-            .collect();
-
+        let vec: MoltList =
+            self.procs.iter().map(|(name, _)| Value::from(name)).collect();
         vec
     }
 
     /// Returns the body of the named procedure, or an error if the name doesn't
     /// name a procedure.
+    #[inline]
     pub fn proc_body(&self, procname: &str) -> MoltResult {
-        if let Some(cmd) = self.commands.get(procname) {
-            if let Command::Proc(proc) = &**cmd {
-                return molt_ok!(proc.body.clone());
-            }
+        if let Some(proc) = self.procs.get(procname) {
+            return molt_ok!(proc.body.clone());
         }
 
         molt_err!("\"{}\" isn't a procedure", procname)
@@ -1994,17 +1993,16 @@ impl<'i> Interp<'i> {
 
     /// Returns a list of the names of the arguments of the named procedure, or an
     /// error if the name doesn't name a procedure.
+    #[inline]
     pub fn proc_args(&self, procname: &str) -> MoltResult {
-        if let Some(cmd) = self.commands.get(procname) {
-            if let Command::Proc(proc) = &**cmd {
-                // Note: the item is guaranteed to be parsible as a list of 1 or 2 elements.
-                let vec: MoltList = proc
-                    .parms
-                    .iter()
-                    .map(|item| item.as_list().expect("invalid proc parms")[0].clone())
-                    .collect();
-                return molt_ok!(Value::from(vec));
-            }
+        if let Some(proc) = self.procs.get(procname) {
+            // Note: the item is guaranteed to be parsible as a list of 1 or 2 elements.
+            let vec: MoltList = proc
+                .parms
+                .iter()
+                .map(|item| item.as_list().expect("invalid proc parms")[0].clone())
+                .collect();
+            return molt_ok!(Value::from(vec));
         }
 
         molt_err!("\"{}\" isn't a procedure", procname)
@@ -2013,25 +2011,28 @@ impl<'i> Interp<'i> {
     /// Returns the default value of the named argument of the named procedure, if it has one.
     /// Returns an error if the procedure has no such argument, or the `procname` doesn't name
     /// a procedure.
-    pub fn proc_default(&self, procname: &str, arg: &str) -> Result<Option<Value>, Exception> {
-        if let Some(cmd) = self.commands.get(procname) {
-            if let Command::Proc(proc) = &**cmd {
-                for argvec in &proc.parms {
-                    let argvec = argvec.as_list()?; // Should never fail
-                    if argvec[0].as_str() == arg {
-                        if argvec.len() == 2 {
-                            return Ok(Some(argvec[1].clone()));
-                        } else {
-                            return Ok(None);
-                        }
+    #[inline]
+    pub fn proc_default(
+        &self,
+        procname: &str,
+        arg: &str,
+    ) -> Result<Option<Value>, Exception> {
+        if let Some(proc) = self.procs.get(procname) {
+            for argvec in &proc.parms {
+                let argvec = argvec.as_list()?; // Should never fail
+                if argvec[0].as_str() == arg {
+                    if argvec.len() == 2 {
+                        return Ok(Some(argvec[1].clone()));
+                    } else {
+                        return Ok(None);
                     }
                 }
-                return molt_err!(
-                    "procedure \"{}\" doesn't have an argument \"{}\"",
-                    procname,
-                    arg
-                );
             }
+            return molt_err!(
+                "procedure \"{}\" doesn't have an argument \"{}\"",
+                procname,
+                arg
+            );
         }
 
         molt_err!("\"{}\" isn't a procedure", procname)
@@ -2052,16 +2053,16 @@ impl<'i> Interp<'i> {
     ///
     /// See the implementation of the `array` command in `commands.rs` and the
     /// [module level documentation](index.html) for examples.
+    #[inline]
     pub fn call_subcommand(
         &mut self,
-        context_ids: &[ContextID],
         argv: &[Value],
         subc: usize,
-        subcommands: &[Subcommand],
+        subcommands: &[Subcommand<Ctx>],
     ) -> MoltResult {
         check_args(subc, argv, subc + 1, 0, "subcommand ?arg ...?")?;
         let rec = Subcommand::find(subcommands, argv[subc].as_str())?;
-        (rec.1)(self, context_ids, argv)
+        (rec.func)(self, argv)
     }
 
     //--------------------------------------------------------------------------------------------
@@ -2074,9 +2075,9 @@ impl<'i> Interp<'i> {
     ///
     /// # Example
     /// ```
-    /// # use molt_ng::types::*;
-    /// # use molt_ng::interp::Interp;
-    /// let mut interp = Interp::new();
+    /// # use molt::types::*;
+    /// # use molt::interp::Interp;
+    /// let mut interp = Interp::default();
     /// assert_eq!(interp.recursion_limit(), 1000);
     /// ```
     pub fn recursion_limit(&self) -> usize {
@@ -2091,9 +2092,9 @@ impl<'i> Interp<'i> {
     ///
     /// # Example
     /// ```
-    /// # use molt_ng::types::*;
-    /// # use molt_ng::interp::Interp;
-    /// let mut interp = Interp::new();
+    /// # use molt::types::*;
+    /// # use molt::interp::Interp;
+    /// let mut interp = Interp::default();
     /// interp.set_recursion_limit(100);
     /// assert_eq!(interp.recursion_limit(), 100);
     /// ```
@@ -2102,174 +2103,12 @@ impl<'i> Interp<'i> {
     }
 
     //--------------------------------------------------------------------------------------------
-    // Context Cache
-
-    /// Saves the client's context data in the interpreter's context cache,
-    /// returning a generated context ID.  Client commands can retrieve the data
-    /// given the ID.
-    ///
-    /// See the [module level documentation](index.html) for an overview and examples.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::interp::Interp;
-    ///
-    /// let mut interp = Interp::new();
-    /// let data: Vec<String> = Vec::new();
-    /// let id = interp.save_context(data);
-    /// ```
-    pub fn save_context<T: 'static>(&mut self, data: T) -> ContextID {
-        let id = self.context_id();
-        self.context_map.insert(id, ContextBox::new(data));
-        id
-    }
-    
-    /// Saves the client's context mutable reference in the interpreter's context cache,
-    /// returning a generated context ID.  Client commands can retrieve the data
-    /// given the ID.
-    ///
-    /// See the [module level documentation](index.html) for an overview and examples.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::interp::Interp;
-    ///
-    /// let mut interp = Interp::new();
-    /// let mut data: Vec<String> = Vec::new();
-    /// let id = interp.save_context_mut(&mut data);
-    /// ```
-    pub fn save_context_mut<T: 'static>(&mut self, data_ref: &'i mut T) -> ContextID {
-        let id = self.context_id();
-        self.context_map.insert(id, ContextBox::new_mut(data_ref));
-        id
-    }
-    
-    /// Retrieves mutable client context data given the context ID.
-    ///
-    /// See the [module level documentation](index.html) for an overview and examples.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::interp::Interp;
-    ///
-    /// let mut interp = Interp::new();
-    /// let data: Vec<String> = Vec::new();
-    /// let id = interp.save_context(data);
-    ///
-    /// // Later...
-    /// let data: &mut Vec<String> = interp.context(id);
-    /// data.push("New Value".into());
-    ///
-    /// // Or
-    /// let data = interp.context::<Vec<String>>(id);
-    /// data.push("New Value".into());
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// This call panics if the context ID is unknown, or if the retrieved data
-    /// has an unexpected type.
-    pub fn context<'j, T: 'static>(&'j mut self, id: ContextID) -> &'j mut T where 'i: 'j {
-        self.context_map
-            .get_mut(&id)
-            .expect("unknown context ID")
-            .get_mut()
-    }
-
-    /// Generates a unique context ID for command context data.
-    ///
-    /// Normally the client will use [`save_context`](#method.save_context) to
-    /// save the context data and generate the client ID in one operation, rather than
-    /// call this explicitly.
-    ////
-    /// # Example
-    ///
-    /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::interp::Interp;
-    ///
-    /// let mut interp = Interp::new();
-    /// let id1 = interp.context_id();
-    /// let id2 = interp.context_id();
-    /// assert_ne!(id1, id2);
-    /// ```
-    pub fn context_id(&mut self) -> ContextID {
-        // TODO: Practically speaking we won't overflow u64; but practically speaking
-        // we should check any.
-        self.last_context_id += 1;
-        ContextID(self.last_context_id)
-    }
-
-    /// Saves a client context value in the interpreter for the given
-    /// context ID.  Client commands can retrieve the data given the context ID.
-    ///
-    /// Normally the client will use [`save_context`](#method.save_context) to
-    /// save the context data and generate the client ID in one operation, rather than
-    /// call this explicitly.
-    ///
-    /// TODO: This method allows the user to generate a context ID and
-    /// put data into the context cache as two separate steps; and to update the
-    /// the data in the context cache for a given ID.  I'm not at all sure that
-    /// either of those things is a good idea.  Waiting to see.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::interp::Interp;
-    ///
-    /// let mut interp = Interp::new();
-    /// let id = interp.context_id();
-    /// let data: Vec<String> = Vec::new();
-    /// interp.set_context(id, data);
-    /// ```
-    pub fn set_context<T: 'static>(&mut self, id: ContextID, data: T) {
-        self.context_map.insert(id, ContextBox::new(data));
-    }
-
-    /// Saves a client context mutable reference in the interpreter for the given
-    /// context ID.  Client commands can retrieve the data given the context ID.
-    ///
-    /// Normally the client will use [`save_context_mut`](#method.save_context_mut) to
-    /// save the context data and generate the client ID in one operation, rather than
-    /// call this explicitly.
-    ///
-    /// TODO: This method allows the user to generate a context ID and
-    /// put data into the context cache as two separate steps; and to update the
-    /// the data in the context cache for a given ID.  I'm not at all sure that
-    /// either of those things is a good idea.  Waiting to see.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use molt_ng::types::*;
-    /// use molt_ng::interp::Interp;
-    ///
-    /// let mut interp = Interp::new();
-    /// let id = interp.context_id();
-    /// let mut data: Vec<String> = Vec::new();
-    /// interp.set_context_mut(id, &mut data);
-    /// ```
-    pub fn set_context_mut<T: 'static>(&mut self, id: ContextID, data_ref: &'i mut T) {
-        self.context_map.insert(id, ContextBox::new_mut(data_ref));
-    }
-
-    //--------------------------------------------------------------------------------------------
     // Profiling
 
     /// Unstable; use at own risk.
-    pub fn profile_save(&mut self, name: &str, start: std::time::Instant) {
+    pub fn profile_save(&mut self, name: &str, start: Instant) {
         let dur = Instant::now().duration_since(start).as_nanos();
-        let rec = self
-            .profile_map
-            .entry(name.into())
-            .or_insert_with(ProfileRecord::new);
+        let rec = self.profile_map.entry(name.into()).or_insert_with(ProfileRecord::new);
 
         rec.count += 1;
         rec.nanos += dur;
@@ -2299,9 +2138,9 @@ impl<'i> Interp<'i> {
     ///
     /// # Example
     /// ```
-    /// # use molt_ng::types::*;
-    /// # use molt_ng::interp::Interp;
-    /// let mut interp = Interp::new();
+    /// # use molt::types::*;
+    /// # use molt::interp::Interp;
+    /// let mut interp = Interp::default();
     /// assert_eq!(interp.continue_on_error(), false);
     /// ```
     pub fn continue_on_error(&self) -> bool {
@@ -2312,9 +2151,9 @@ impl<'i> Interp<'i> {
     ///
     /// # Example
     /// ```
-    /// # use molt_ng::types::*;
-    /// # use molt_ng::interp::Interp;
-    /// let mut interp = Interp::new();
+    /// # use molt::types::*;
+    /// # use molt::interp::Interp;
+    /// let mut interp = Interp::default();
     /// interp.set_continue_on_error(true);
     /// assert_eq!(interp.continue_on_error(), true);
     /// ```
@@ -2330,7 +2169,8 @@ impl<'i> Interp<'i> {
 /// NOTE: We do not save the procedure's name; the name exists only in the
 /// commands table, and can be changed there freely.  The procedure truly doesn't
 /// know what its name is except when it is being executed.
-struct Procedure {
+#[derive(Debug, Clone)]
+pub struct Procedure {
     /// The procedure's parameter list.  Each item in the list is a name or a
     /// name/default value pair.  (This is verified by the `proc` command.)
     parms: MoltList,
@@ -2341,7 +2181,10 @@ struct Procedure {
 }
 
 impl Procedure {
-    fn execute(&self, interp: &mut Interp, argv: &[Value]) -> MoltResult {
+    pub fn execute<Ctx>(&self, interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult
+    where
+        Ctx: 'static,
+    {
         // FIRST, push the proc's local scope onto the stack.
         interp.push_scope();
 
@@ -2405,7 +2248,9 @@ impl Procedure {
                 ResultCode::Error => Err(exception),
                 ResultCode::Return => Err(exception), // -level > 0
                 ResultCode::Break => molt_err!("invoked \"break\" outside of a loop"),
-                ResultCode::Continue => molt_err!("invoked \"continue\" outside of a loop"),
+                ResultCode::Continue => {
+                    molt_err!("invoked \"continue\" outside of a loop")
+                }
                 // TODO: Better error message
                 ResultCode::Other(_) => molt_err!("unexpected result code."),
             };
@@ -2454,15 +2299,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_empty() {
-        let interp = Interp::empty();
-        // Interpreter is empty
-        assert!(interp.command_names().is_empty());
-    }
-
-    #[test]
     fn test_new() {
-        let interp = Interp::new();
+        let interp = Interp::default();
 
         // Interpreter is not empty
         assert!(!interp.command_names().is_empty());
@@ -2473,13 +2311,10 @@ mod tests {
 
     #[test]
     fn test_eval() {
-        let mut interp = Interp::new();
+        let mut interp = Interp::default();
 
         assert_eq!(interp.eval("set a 1"), Ok(Value::from("1")));
-        assert!(ex_match(
-            &interp.eval("error 2"),
-            Exception::molt_err(Value::from("2"))
-        ));
+        assert!(ex_match(&interp.eval("error 2"), Exception::molt_err(Value::from("2"))));
         assert_eq!(interp.eval("return 3"), Ok(Value::from("3")));
         assert!(ex_match(
             &interp.eval("break"),
@@ -2504,20 +2339,14 @@ mod tests {
 
     #[test]
     fn test_eval_value() {
-        let mut interp = Interp::new();
+        let mut interp = Interp::default();
 
-        assert_eq!(
-            interp.eval_value(&Value::from("set a 1")),
-            Ok(Value::from("1"))
-        );
+        assert_eq!(interp.eval_value(&Value::from("set a 1")), Ok(Value::from("1")));
         assert!(ex_match(
             &interp.eval_value(&Value::from("error 2")),
             Exception::molt_err(Value::from("2"))
         ));
-        assert_eq!(
-            interp.eval_value(&Value::from("return 3")),
-            Ok(Value::from("3"))
-        );
+        assert_eq!(interp.eval_value(&Value::from("return 3")), Ok(Value::from("3")));
         assert!(ex_match(
             &interp.eval_value(&Value::from("break")),
             Exception::molt_err(Value::from("invoked \"break\" outside of a loop"))
@@ -2530,7 +2359,7 @@ mod tests {
 
     #[test]
     fn test_complete() {
-        let mut interp = Interp::new();
+        let mut interp = Interp::default();
 
         assert!(interp.complete("abc"));
         assert!(interp.complete("a {bc} [def] \"ghi\" xyz"));
@@ -2542,44 +2371,38 @@ mod tests {
 
     #[test]
     fn test_expr() {
-        let mut interp = Interp::new();
+        let mut interp = Interp::default();
         assert_eq!(interp.expr(&Value::from("1 + 2")), Ok(Value::from(3)));
         assert_eq!(
             interp.expr(&Value::from("a + b")),
-            Err(Exception::molt_err(Value::from(
-                "unknown math function \"a\""
-            )))
+            Err(Exception::molt_err(Value::from("unknown math function \"a\"")))
         );
     }
 
     #[test]
     fn test_expr_bool() {
-        let mut interp = Interp::new();
+        let mut interp = Interp::default();
         assert_eq!(interp.expr_bool(&Value::from("1")), Ok(true));
         assert_eq!(interp.expr_bool(&Value::from("0")), Ok(false));
         assert_eq!(
             interp.expr_bool(&Value::from("a")),
-            Err(Exception::molt_err(Value::from(
-                "unknown math function \"a\""
-            )))
+            Err(Exception::molt_err(Value::from("unknown math function \"a\"")))
         );
     }
 
     #[test]
     fn test_expr_int() {
-        let mut interp = Interp::new();
+        let mut interp = Interp::default();
         assert_eq!(interp.expr_int(&Value::from("1 + 2")), Ok(3));
         assert_eq!(
             interp.expr_int(&Value::from("a")),
-            Err(Exception::molt_err(Value::from(
-                "unknown math function \"a\""
-            )))
+            Err(Exception::molt_err(Value::from("unknown math function \"a\"")))
         );
     }
 
     #[test]
     fn test_expr_float() {
-        let mut interp = Interp::new();
+        let mut interp = Interp::default();
         let val = interp
             .expr_float(&Value::from("1.1 + 2.2"))
             .expect("floating point value");
@@ -2588,15 +2411,13 @@ mod tests {
 
         assert_eq!(
             interp.expr_float(&Value::from("a")),
-            Err(Exception::molt_err(Value::from(
-                "unknown math function \"a\""
-            )))
+            Err(Exception::molt_err(Value::from("unknown math function \"a\"")))
         );
     }
 
     #[test]
     fn test_recursion_limit() {
-        let mut interp = Interp::new();
+        let mut interp = Interp::default();
 
         assert_eq!(interp.recursion_limit(), 1000);
         interp.set_recursion_limit(100);
@@ -2611,120 +2432,34 @@ mod tests {
         ));
     }
 
-    //-----------------------------------------------------------------------
-    // Context Cache tests
-
     #[test]
-    fn context_basic_use() {
-        let mut interp = Interp::new();
-
-        // Save a context object.
-        let id = interp.save_context(String::from("ABC"));
-
-        // Retrieve it.
-        let ctx = interp.context::<String>(id);
-        assert_eq!(*ctx, "ABC");
-        ctx.push_str("DEF");
-
-        let ctx = interp.context::<String>(id);
-        assert_eq!(*ctx, "ABCDEF");
-    }
-
-    #[test]
-    fn context_advanced_use() {
-        let mut interp = Interp::new();
-
-        // Save a context object.
-        let id = interp.context_id();
-        interp.set_context(id, String::from("ABC"));
-
-        // Retrieve it.
-        let ctx = interp.context::<String>(id);
-        assert_eq!(*ctx, "ABC");
-    }
-
-    #[test]
-    fn context_mut() {
-        let mut interp = Interp::new();
-        let mut s = String::from("ABC");
-
-        // Save a context object.
-        let id = interp.context_id();
-        interp.set_context_mut(id, &mut s);
-
-        // Retrieve it.
-        let ctx = interp.context::<String>(id);
-        assert_eq!(*ctx, "ABC");
-    }
-
-    #[test]
-    #[should_panic]
-    fn context_unknown() {
-        let mut interp = Interp::new();
-
-        // Valid ID Generated, but no context saved.
-        let id = interp.context_id();
-
-        // Try to retrieve it.
-        let _ctx = interp.context::<String>(id);
-
-        // Should panic!
-    }
-
-    #[test]
-    #[should_panic]
-    fn context_wrong_type() {
-        let mut interp = Interp::new();
-
-        // Save a context object.
-        let id = interp.save_context(String::from("ABC"));
-
-        // Try to retrieve it as something else.
-        let _ctx = interp.context::<Vec<String>>(id);
-
-        // Should panic!
-    }
-
-    #[test]
-    #[should_panic]
-    fn context_forgotten_1_command() {
-        let mut interp = Interp::new();
-
-        // Save a context object.
-        let id = interp.save_context(String::from("ABC"));
-
-        // Use it with a command.
-        interp.add_context_command("dummy", dummy_cmd, &[id]);
-
-        // Remove the command.
-        interp.remove_command("dummy");
-
-        // Try to retrieve it; this should panic.
-        let _ctx = interp.context::<String>(id);
-    }
-
-    #[test]
-    #[should_panic(expected = "unknown context ID")]
     fn context_forgotten_2_commands() {
-        let mut interp = Interp::new();
-
-        // Save a context object.
-        let id = interp.save_context(String::from("ABC"));
-
-        // Use it with a command.
-        interp.add_context_command("dummy", dummy_cmd, &[id]);
-        interp.add_context_command("dummy2", dummy_cmd, &[id]);
-
-        // Remove the command.
-        interp.remove_command("dummy");
-        assert_eq!(interp.context::<String>(id), "ABC");
-        interp.remove_command("dummy2");
-
-        // Try to retrieve it; this should panic.
-        let _ctx = interp.context::<String>(id);
+        use crate::prelude::*;
+        let _interp = Interp::new(
+            (),
+            gen_command!(
+                (),
+                // native commands
+                [
+                    // TODO: Requires file access.  Ultimately, might go in an extension crate if
+                    // the necessary operations aren't available in core::).
+                    (_SOURCE, cmd_source),
+                    // TODO: Useful for entire programs written in Molt; but not necessarily wanted in
+                    // extension scripts).
+                    (_EXIT, cmd_exit),
+                    // TODO: Developer Tools
+                    (_PARSE, cmd_parse),
+                    (_PDUMP, cmd_pdump),
+                    (_PCLEAR, cmd_pclear)
+                ],
+                // embedded commands
+                [("dummy", dummy_cmd), ("dummy2", dummy_cmd)]
+            ),
+            true,
+        );
     }
 
-    fn dummy_cmd(_: &mut Interp, _: &[ContextID], _: &[Value]) -> MoltResult {
+    fn dummy_cmd(_: &mut Interp<()>, _: &[Value]) -> MoltResult {
         molt_err!("Not really meant to be called")
     }
 }

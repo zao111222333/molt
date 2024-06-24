@@ -23,8 +23,6 @@
 // #![doc(html_root_url = "https://docs.rs/molt/0.3.0")]
 // #![doc(html_logo_url = "https://github.com/wduquette/molt/raw/master/MoltLogo.png")]
 
-pub use crate::interp::Interp;
-pub use crate::test_harness::test_harness;
 pub use crate::types::*;
 
 mod commands;
@@ -33,6 +31,7 @@ mod eval_ptr;
 mod expr;
 pub mod interp;
 mod list;
+pub mod prelude;
 mod tokenizer;
 #[macro_use]
 mod macros;
@@ -86,85 +85,63 @@ pub mod value;
 /// check_args(1, argv, 2, 0, "varName ?value value ...?")?;
 /// ```
 pub fn check_args(
-    namec: usize,
-    argv: &[Value],
-    min: usize,
-    max: usize,
-    argsig: &str,
+  namec: usize,
+  argv: &[Value],
+  min: usize,
+  max: usize,
+  argsig: &str,
 ) -> MoltResult {
-    assert!(namec >= 1);
-    assert!(min >= 1);
-    assert!(!argv.is_empty());
+  assert!(namec >= 1);
+  assert!(min >= 1);
+  assert!(!argv.is_empty());
 
-    if argv.len() < min || (max > 0 && argv.len() > max) {
-        let cmd_tokens = Value::from(&argv[0..namec]);
-        molt_err!(
-            "wrong # args: should be \"{} {}\"",
-            cmd_tokens.to_string(),
-            argsig
-        )
-    } else {
-        molt_ok!()
-    }
+  if argv.len() < min || (max > 0 && argv.len() > max) {
+    let cmd_tokens = Value::from(&argv[0..namec]);
+    molt_err!("wrong # args: should be \"{} {}\"", cmd_tokens.to_string(), argsig)
+  } else {
+    molt_ok!()
+  }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+  use super::*;
 
-    #[test]
-    fn test_check_args() {
-        assert_ok(&check_args(1, &mklist(vec!["mycmd"].as_slice()), 1, 1, ""));
-        assert_ok(&check_args(
-            1,
-            &mklist(vec!["mycmd"].as_slice()),
-            1,
-            2,
-            "arg1",
-        ));
-        assert_ok(&check_args(
-            1,
-            &mklist(vec!["mycmd", "data"].as_slice()),
-            1,
-            2,
-            "arg1",
-        ));
-        assert_ok(&check_args(
-            1,
-            &mklist(vec!["mycmd", "data", "data2"].as_slice()),
-            1,
-            0,
-            "arg1",
-        ));
+  #[test]
+  fn test_check_args() {
+    assert_ok(&check_args(1, &mklist(vec!["mycmd"].as_slice()), 1, 1, ""));
+    assert_ok(&check_args(1, &mklist(vec!["mycmd"].as_slice()), 1, 2, "arg1"));
+    assert_ok(&check_args(1, &mklist(vec!["mycmd", "data"].as_slice()), 1, 2, "arg1"));
+    assert_ok(&check_args(
+      1,
+      &mklist(vec!["mycmd", "data", "data2"].as_slice()),
+      1,
+      0,
+      "arg1",
+    ));
 
-        assert_err(
-            &check_args(1, &mklist(vec!["mycmd"].as_slice()), 2, 2, "arg1"),
-            "wrong # args: should be \"mycmd arg1\"",
-        );
-        assert_err(
-            &check_args(
-                1,
-                &mklist(vec!["mycmd", "val1", "val2"].as_slice()),
-                2,
-                2,
-                "arg1",
-            ),
-            "wrong # args: should be \"mycmd arg1\"",
-        );
-    }
+    assert_err(
+      &check_args(1, &mklist(vec!["mycmd"].as_slice()), 2, 2, "arg1"),
+      "wrong # args: should be \"mycmd arg1\"",
+    );
+    assert_err(
+      &check_args(1, &mklist(vec!["mycmd", "val1", "val2"].as_slice()), 2, 2, "arg1"),
+      "wrong # args: should be \"mycmd arg1\"",
+    );
+  }
 
-    // TODO: stopgap until we have finalized the MoltList API.
-    fn mklist(argv: &[&str]) -> MoltList {
-        argv.iter().map(|s| Value::from(*s)).collect()
-    }
+  // TODO: stopgap until we have finalized the MoltList API.
+  fn mklist(argv: &[&str]) -> MoltList {
+    argv.iter().map(|s| Value::from(*s)).collect()
+  }
 
-    // Helpers
+  // Helpers
 
-    fn assert_err(result: &MoltResult, msg: &str) {
-        assert_eq!(molt_err!(msg), *result);
-    }
+  fn assert_err(result: &MoltResult, msg: &str) {
+    assert_eq!(molt_err!(msg), *result);
+  }
 
-    fn assert_ok(result: &MoltResult) {
-        assert!(result.is_ok(), "Result is not Ok");
-    }
+  fn assert_ok(result: &MoltResult) {
+    assert!(result.is_ok(), "Result is not Ok");
+  }
 }
