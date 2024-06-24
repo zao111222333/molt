@@ -1,3 +1,5 @@
+use gloo::timers::callback::Timeout;
+use log::debug;
 use molt_forked::prelude::*;
 use std::mem;
 use yew::prelude::*;
@@ -73,8 +75,13 @@ impl Component for App {
             hist: Vec::new(),
             current_hist_idx: None,
         };
-        app.execute("set hello \"this is a tcl demo\"".into());
-        app.execute("puts $hello".into());
+        app.execute(
+            "proc say_hello {name} {
+    puts \"Hello, $name!\"
+}"
+            .into(),
+        );
+        app.execute("say_hello \"World\"".into());
         app.execute(
             "set a {}
 for {set i 1} {$i < 6} {incr i} {
@@ -89,6 +96,10 @@ set a"
                 .into(),
         );
         app.execute("square \"abc\"".into());
+        app.execute("info cmdtype puts".into());
+        app.execute("info cmdtype square".into());
+        app.execute("info cmdtype say_hello".into());
+        app.execute("info commands".into());
         app
     }
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
@@ -171,10 +182,27 @@ set a"
             Msg::None => false,
         }
     }
-    fn view(&self, ctx: &Context<Self>) -> Html {
-        if let Some(element) = self.input_div_ref.cast::<web_sys::Element>() {
-            element.set_scroll_top(element.scroll_height());
+    fn rendered(&mut self, _ctx: &Context<Self>, first_render: bool) {
+        if first_render {
+            // NOTICE: slip scroll animation
+            if let Some(element) = self.hist_div_ref.cast::<web_sys::Element>() {
+                let target_scroll_top = element.scroll_height();
+                let current_scroll_top = element.scroll_top();
+                let distance = target_scroll_top - current_scroll_top;
+                let steps = 40;
+                let step_duration = 25;
+                for step in 0..steps {
+                    let current_scroll_top = current_scroll_top + distance * step / steps;
+                    let element = element.clone();
+                    Timeout::new((step_duration * step) as u32, move || {
+                        element.set_scroll_top(current_scroll_top);
+                    })
+                    .forget();
+                }
+            }
         }
+    }
+    fn view(&self, ctx: &Context<Self>) -> Html {
         html! {
           <>
           <div>
