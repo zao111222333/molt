@@ -1,5 +1,4 @@
 use gloo::timers::callback::Timeout;
-use log::debug;
 use molt_forked::prelude::*;
 use std::mem;
 use web_sys::HtmlTextAreaElement;
