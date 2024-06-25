@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.4.3"
+version = "0.4.4"
 edition = "2021"
 license = "MIT"
 authors = ["Will Duquette <will@wjduquette.com>", "Zizheng Guo <gzz_2000@126.com>", "Junzhuo Zhou <zhou@junzhuo.site>"]

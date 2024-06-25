@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/molt-forked.svg)](https://crates.io/crates/molt-forked)
 
-This is a forked version of `molt`, a embeddable TCL interpreter for Rust applications. The original repository is no longer actively maintained, and this version aims to continue its development, fix bugs, and add new features.
+This is a forked version of `molt`, a embeddable TCL interpreter for Rust applications. The original repository is no longer actively maintained, and this version aims to continue its development, fix bugs, and add new features. WASM runtime support. See [demo](https://zao111222333.github.io/molt-forked/demo/).
 
 ## TODO
 
@@ -15,7 +15,7 @@ This is a forked version of `molt`, a embeddable TCL interpreter for Rust applic
 
 ## New in Molt-forked 0.4.0
 
-* WASM runtime support. See [demo](https://zao111222333.github.io/molt-forked/demo/), the code is in `molt-wasm` and you can find that the size of compiled WASM binary is only ~600k.
+* WASM runtime support. See [demo](https://zao111222333.github.io/molt-forked/demo/) and you can find that the size of compiled WASM binary is only ~600k.
 * Remove `ContextMap` and related attributes / function parameters in Interpreter. Now the definiton of Interpreter is `Interp<Ctx>` (with user-defined generic `Ctx`), we can access Interpreter's Context directly via `interp.context`.
 * The native commands now is static, we can use `gen_command!` macro to init Command.
   

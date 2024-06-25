@@ -584,7 +584,7 @@ pub struct Interp<Ctx> where
 pub struct Interp<Ctx> where
   Ctx: 'static,
 {
-  name: &'static str,
+  pub name: &'static str,
   // Command Table
   command: Command<Ctx>,
   procs: HashMap<String, Rc<Procedure>>,
