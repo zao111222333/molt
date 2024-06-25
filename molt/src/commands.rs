@@ -78,18 +78,19 @@ pub fn cmd_append<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
 
 /// # array *subcommand* ?*arg*...?
 pub fn cmd_array<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
-    interp.call_subcommand(
-        argv,
+    let f = gen_subcommand!(
+        Ctx,
         1,
-        &[
-            Subcommand::new("exists", cmd_array_exists::<Ctx>),
-            Subcommand::new("get", cmd_array_get::<Ctx>),
-            Subcommand::new("names", cmd_array_names::<Ctx>),
-            Subcommand::new("set", cmd_array_set::<Ctx>),
-            Subcommand::new("size", cmd_array_size::<Ctx>),
-            Subcommand::new("unset", cmd_array_unset::<Ctx>),
+        [
+            ("exists", cmd_array_exists),
+            ("get", cmd_array_get),
+            ("names", cmd_array_names),
+            ("set", cmd_array_set),
+            ("size", cmd_array_size),
+            ("unset", cmd_array_unset),
         ],
-    )
+    );
+    f(interp, argv)
 }
 
 /// # array exists arrayName
@@ -234,21 +235,22 @@ pub fn cmd_continue<Ctx>(_interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResul
 
 /// # dict *subcommand* ?*arg*...?
 pub fn cmd_dict<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
-    interp.call_subcommand(
-        argv,
+    let f = gen_subcommand!(
+        Ctx,
         1,
-        &[
-            Subcommand::new("create", cmd_dict_new::<Ctx>),
-            Subcommand::new("exists", cmd_dict_exists::<Ctx>),
-            Subcommand::new("get", cmd_dict_get::<Ctx>),
-            Subcommand::new("keys", cmd_dict_keys::<Ctx>),
-            Subcommand::new("remove", cmd_dict_remove::<Ctx>),
-            Subcommand::new("set", cmd_dict_set::<Ctx>),
-            Subcommand::new("size", cmd_dict_size::<Ctx>),
-            Subcommand::new("unset", cmd_dict_unset::<Ctx>),
-            Subcommand::new("values", cmd_dict_values::<Ctx>),
+        [
+            ("create", cmd_dict_new),
+            ("exists", cmd_dict_exists),
+            ("get", cmd_dict_get),
+            ("keys", cmd_dict_keys),
+            ("remove", cmd_dict_remove),
+            ("set", cmd_dict_set),
+            ("size", cmd_dict_size),
+            ("unset", cmd_dict_unset),
+            ("values", cmd_dict_values),
         ],
-    )
+    );
+    f(interp, argv)
 }
 
 /// # dict create ?key value ...?
@@ -658,23 +660,24 @@ pub fn cmd_incr<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
 
 /// # info *subcommand* ?*arg*...?
 pub fn cmd_info<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
-    interp.call_subcommand(
-        argv,
+    let f = gen_subcommand!(
+        Ctx,
         1,
-        &[
-            Subcommand::new("args", cmd_info_args::<Ctx>),
-            Subcommand::new("body", cmd_info_body::<Ctx>),
-            Subcommand::new("cmdtype", cmd_info_cmdtype::<Ctx>),
-            Subcommand::new("commands", cmd_info_commands::<Ctx>),
-            Subcommand::new("complete", cmd_info_complete::<Ctx>),
-            Subcommand::new("default", cmd_info_default::<Ctx>),
-            Subcommand::new("exists", cmd_info_exists::<Ctx>),
-            Subcommand::new("globals", cmd_info_globals::<Ctx>),
-            Subcommand::new("locals", cmd_info_locals::<Ctx>),
-            Subcommand::new("procs", cmd_info_procs::<Ctx>),
-            Subcommand::new("vars", cmd_info_vars::<Ctx>),
+        [
+            ("args", cmd_info_args),
+            ("body", cmd_info_body),
+            ("cmdtype", cmd_info_cmdtype),
+            ("commands", cmd_info_commands),
+            ("complete", cmd_info_complete),
+            ("default", cmd_info_default),
+            ("exists", cmd_info_exists),
+            ("globals", cmd_info_globals),
+            ("locals", cmd_info_locals),
+            ("procs", cmd_info_procs),
+            ("vars", cmd_info_vars),
         ],
-    )
+    );
+    f(interp, argv)
 }
 
 /// # info args *procname*
@@ -1043,29 +1046,30 @@ pub fn cmd_source<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
 
 /// # string *subcommand* ?*arg*...?
 pub fn cmd_string<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
-    interp.call_subcommand(
-        argv,
+    let f = gen_subcommand!(
+        Ctx,
         1,
-        &[
-            Subcommand::new("cat", cmd_string_cat::<Ctx>),
-            Subcommand::new("compare", cmd_string_compare::<Ctx>),
-            Subcommand::new("equal", cmd_string_equal::<Ctx>),
-            Subcommand::new("first", cmd_string_first::<Ctx>),
-            // Subcommand::new("index", cmd_string_todo::<Ctx>),
-            Subcommand::new("last", cmd_string_last::<Ctx>),
-            Subcommand::new("length", cmd_string_length::<Ctx>),
-            Subcommand::new("map", cmd_string_map::<Ctx>),
-            Subcommand::new("range", cmd_string_range::<Ctx>),
-            // Subcommand::new("replace", cmd_string_todo::<Ctx>),
-            // Subcommand::new("repeat", cmd_string_todo::<Ctx>),
-            // Subcommand::new("reverse", cmd_string_todo::<Ctx>),
-            Subcommand::new("tolower", cmd_string_tolower::<Ctx>),
-            Subcommand::new("toupper", cmd_string_toupper::<Ctx>),
-            Subcommand::new("trim", cmd_string_trim::<Ctx>),
-            Subcommand::new("trimleft", cmd_string_trim::<Ctx>),
-            Subcommand::new("trimright", cmd_string_trim::<Ctx>),
+        [
+            ("cat", cmd_string_cat),
+            ("compare", cmd_string_compare),
+            ("equal", cmd_string_equal),
+            ("first", cmd_string_first),
+            // ("index", cmd_string_todo),
+            ("last", cmd_string_last),
+            ("length", cmd_string_length),
+            ("map", cmd_string_map),
+            ("range", cmd_string_range),
+            // ("replace", cmd_string_todo),
+            // ("repeat", cmd_string_todo),
+            // ("reverse", cmd_string_todo),
+            ("tolower", cmd_string_tolower),
+            ("toupper", cmd_string_toupper),
+            ("trim", cmd_string_trim),
+            ("trimleft", cmd_string_trim),
+            ("trimright", cmd_string_trim),
         ],
-    )
+    );
+    f(interp, argv)
 }
 
 /// Temporary: stub for string subcommands.

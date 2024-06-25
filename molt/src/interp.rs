@@ -2037,33 +2037,6 @@ where
         molt_err!("\"{}\" isn't a procedure", procname)
     }
 
-    /// Calls a subcommand of the current command, looking up its name in an array of
-    /// `Subcommand` tuples.
-    ///
-    /// The subcommand, if found, is called with the same `context_ids` and `argv` as its
-    /// parent ensemble.  `subc` is the index of the subcommand's name in the `argv` array;
-    /// in most cases it will be `1`, but it is possible to define subcommands with
-    /// subcommands of their own.  The `subcommands` argument is a borrow of an array of
-    /// `Subcommand` records, each defining a subcommand's name and `CommandFunc`.
-    ///
-    /// If the subcommand name is found in the array, the matching `CommandFunc` is called.
-    /// otherwise, the error message gives the ensemble syntax.  If an invalid subcommand
-    /// name was provided, the error message includes the valid options.
-    ///
-    /// See the implementation of the `array` command in `commands.rs` and the
-    /// [module level documentation](index.html) for examples.
-    #[inline]
-    pub fn call_subcommand(
-        &mut self,
-        argv: &[Value],
-        subc: usize,
-        subcommands: &[Subcommand<Ctx>],
-    ) -> MoltResult {
-        check_args(subc, argv, subc + 1, 0, "subcommand ?arg ...?")?;
-        let rec = Subcommand::find(subcommands, argv[subc].as_str())?;
-        (rec.func)(self, argv)
-    }
-
     //--------------------------------------------------------------------------------------------
     // Interpreter Configuration
 
@@ -2079,6 +2052,7 @@ where
     /// let mut interp = Interp::default();
     /// assert_eq!(interp.recursion_limit(), 1000);
     /// ```
+    #[inline]
     pub fn recursion_limit(&self) -> usize {
         self.recursion_limit
     }
@@ -2097,6 +2071,7 @@ where
     /// interp.set_recursion_limit(100);
     /// assert_eq!(interp.recursion_limit(), 100);
     /// ```
+    #[inline]
     pub fn set_recursion_limit(&mut self, limit: usize) {
         self.recursion_limit = limit;
     }

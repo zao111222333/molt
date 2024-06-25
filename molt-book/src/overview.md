@@ -4,6 +4,10 @@
 
 This is a forked version of `molt`, a embeddable TCL interpreter for Rust applications. The original repository is no longer actively maintained, and this version aims to continue its development, fix bugs, and add new features.
 
+## New in Molt-forked 0.4.1
+
+* The subcommands now is static, we can use `gen_subcommand!` macro to init SubCommand.
+
 ## New in Molt-forked 0.4.0
 
 * WASM runtime support, see demo at [here](https://zao111222333.github.io/molt-forked/demo/), the demo project is in `molt-wasm` and you can find that the size of compiled WASM binary is only ~600k.

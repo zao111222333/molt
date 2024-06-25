@@ -159,10 +159,72 @@ macro_rules! molt_throw {
 }
 
 #[macro_export]
+macro_rules! join_strings {
+  () => {
+      ""
+  };
+  ($a:expr $(,)?) => {
+      $a
+  };
+  ($a:expr, $b:expr $(,)?) => {
+      concat!($a, " or ", $b)
+  };
+  ($a:expr, $($rest:expr),+ $(,)?) => {
+      concat!($a, ", ", join_strings!($($rest),+))
+  };
+}
+
+/// A Molt command that has subcommands is called an _ensemble_ command.  In Rust code,
+/// the ensemble is defined as an array of `Subcommand` structs, each one mapping from
+/// a subcommand name to the implementing [`CommandFunc`].  For more information,
+/// see the discussion of command definition in [The Molt Book] and the [`interp`] module.
+///
+/// The tuple fields are the subcommand's name and implementing [`CommandFunc`].
+///
+/// [The Molt Book]: https://wduquette.github.io/molt/
+/// [`interp`]: ../interp/index.html
+/// [`CommandFunc`]: type.CommandFunc.html
+///
+/// Calls a subcommand of the current command, looking up its name in an array of
+/// `Subcommand` tuples.
+///
+/// The subcommand, if found, is called with the same `context_ids` and `argv` as its
+/// parent ensemble.  `subc` is the index of the subcommand's name in the `argv` array;
+/// in most cases it will be `1`, but it is possible to define subcommands with
+/// subcommands of their own.  The `subcommands` argument is a borrow of an array of
+/// `Subcommand` records, each defining a subcommand's name and `CommandFunc`.
+///
+/// If the subcommand name is found in the array, the matching `CommandFunc` is called.
+/// otherwise, the error message gives the ensemble syntax.  If an invalid subcommand
+/// name was provided, the error message includes the valid options.
+///
+/// See the implementation of the `array` command in `commands.rs` and the
+/// [module level documentation](index.html) for examples.
+#[macro_export]
+macro_rules! gen_subcommand {
+  ($ctx_type:ty, $subc:expr, [ $( ($native_name:tt, $native_func:expr) ),* $(,)?] $(,)?) => {
+    {
+      #[inline]
+      fn f<T:'static>(interp: &mut Interp<T>, argv: &[Value]) -> MoltResult {
+        check_args($subc, argv, $subc + 1, 0, "subcommand ?arg ...?")?;
+        let sub_name = argv[$subc].as_str();
+        match sub_name {
+          $(
+            $native_name => $native_func(interp, argv),
+          )*
+          _ => molt_err!("unknown or ambiguous subcommand \"{}\": must be {}.", sub_name, join_strings!( $($native_name,)* )),
+        }
+      }
+      f as fn(&mut Interp<$ctx_type>, &[Value]) -> MoltResult
+    }
+  }
+}
+
+#[macro_export]
 macro_rules! gen_command {
-  ($input:ty, [ $( ($native_name:tt, $native_func:expr) ),* ], [ $( ($embedded_name:tt, $embedded_func:expr) ),* ]) => {
+  ($ctx_type:ty, [ $( ($native_name:tt, $native_func:expr) ),* $(,)?], [ $( ($embedded_name:tt, $embedded_func:expr) ),* $(,)?] $(,)?) => {
     Command::new(
-      {fn f(name: &str, interp: &mut Interp<$input>, argv: &[Value]) -> MoltResult {
+      {fn f(name: &str, interp: &mut Interp<$ctx_type>, argv: &[Value]) -> MoltResult {
         match name {
           // NOTICE: Default native commands
           _APPEND => cmd_append(interp, argv),
@@ -213,9 +275,9 @@ macro_rules! gen_command {
           }
         }
       }
-      f as fn(&str, &mut Interp<$input>, &[Value]) -> MoltResult
+      f as fn(&str, &mut Interp<$ctx_type>, &[Value]) -> MoltResult
       },
-      {fn f(name: &str, interp: &Interp<$input>) -> Option<CommandType> {
+      {fn f(name: &str, interp: &Interp<$ctx_type>) -> Option<CommandType> {
         match name {
           _APPEND => Some(CommandType::Native),
           _ARRAY => Some(CommandType::Native),
@@ -262,7 +324,7 @@ macro_rules! gen_command {
           }
         }
       }
-      f as fn(&str, &Interp<$input>) -> Option<CommandType>
+      f as fn(&str, &Interp<$ctx_type>) -> Option<CommandType>
       },
       &[
         _APPEND,
@@ -310,50 +372,50 @@ macro_rules! gen_command {
 
 #[cfg(test)]
 mod tests {
-  use crate::*;
+    use crate::*;
 
-  #[test]
-  fn test_molt_ok() {
-    let result: MoltResult = molt_ok!();
-    assert_eq!(Ok(Value::empty()), result);
+    #[test]
+    fn test_molt_ok() {
+        let result: MoltResult = molt_ok!();
+        assert_eq!(Ok(Value::empty()), result);
 
-    let result: MoltResult = molt_ok!(5);
-    assert_eq!(Ok(Value::from(5)), result);
+        let result: MoltResult = molt_ok!(5);
+        assert_eq!(Ok(Value::from(5)), result);
 
-    let result: MoltResult = molt_ok!("Five");
-    assert_eq!(Ok(Value::from("Five")), result);
+        let result: MoltResult = molt_ok!("Five");
+        assert_eq!(Ok(Value::from("Five")), result);
 
-    let result: MoltResult = molt_ok!("The answer is {}.", 5);
-    assert_eq!(Ok(Value::from("The answer is 5.")), result);
-  }
-
-  #[test]
-  fn test_molt_err() {
-    check_err(molt_err!("error message"), "error message");
-    check_err(molt_err!("error {}", 5), "error 5");
-  }
-
-  #[test]
-  fn test_molt_throw() {
-    check_throw(molt_throw!("MYERR", "error message"), "MYERR", "error message");
-    check_throw(molt_throw!("MYERR", "error {}", 5), "MYERR", "error 5");
-  }
-
-  fn check_err(result: MoltResult, msg: &str) -> bool {
-    match result {
-      Err(exception) => exception.is_error() && exception.value() == msg.into(),
-      _ => false,
+        let result: MoltResult = molt_ok!("The answer is {}.", 5);
+        assert_eq!(Ok(Value::from("The answer is 5.")), result);
     }
-  }
 
-  fn check_throw(result: MoltResult, code: &str, msg: &str) -> bool {
-    match result {
-      Err(exception) => {
-        exception.is_error()
-          && exception.value() == msg.into()
-          && exception.error_code() == code.into()
-      }
-      _ => false,
+    #[test]
+    fn test_molt_err() {
+        check_err(molt_err!("error message"), "error message");
+        check_err(molt_err!("error {}", 5), "error 5");
     }
-  }
+
+    #[test]
+    fn test_molt_throw() {
+        check_throw(molt_throw!("MYERR", "error message"), "MYERR", "error message");
+        check_throw(molt_throw!("MYERR", "error {}", 5), "MYERR", "error 5");
+    }
+
+    fn check_err(result: MoltResult, msg: &str) -> bool {
+        match result {
+            Err(exception) => exception.is_error() && exception.value() == msg.into(),
+            _ => false,
+        }
+    }
+
+    fn check_throw(result: MoltResult, code: &str, msg: &str) -> bool {
+        match result {
+            Err(exception) => {
+                exception.is_error()
+                    && exception.value() == msg.into()
+                    && exception.error_code() == code.into()
+            }
+            _ => false,
+        }
+    }
 }
