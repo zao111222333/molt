@@ -896,7 +896,7 @@ pub fn cmd_proc<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
 pub fn cmd_puts<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
     check_args(1, argv, 2, 2, "string")?;
     cfg_if::cfg_if! {
-      if #[cfg(feature = "wasm")] {
+      if #[cfg(feature = "std_buff")] {
         interp.std_buff.push(Ok(argv[1].clone()));
       } else {
         println!("{}", argv[1]);

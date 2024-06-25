@@ -17,4 +17,5 @@ wasm-timer = { version = "0.2.5", optional = true}
 
 [features]
 default = []
-wasm = ["dep:wasm-timer"]
+wasm = ["std_buff", "dep:wasm-timer"]
+std_buff = []

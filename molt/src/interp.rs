@@ -491,7 +491,7 @@ impl<Ctx> Command<Ctx> {
     }
 }
 cfg_if::cfg_if! {
-  if #[cfg(feature = "wasm")] {
+  if #[cfg(feature = "std_buff")] {
 /// The Molt Interpreter.
 ///
 /// The `Interp` struct is the primary API for
@@ -584,7 +584,7 @@ pub struct Interp<Ctx> where
 {
   // Command Table
   command: Command<Ctx>,
-  pub procs: HashMap<String, Rc<Procedure>>,
+  procs: HashMap<String, Rc<Procedure>>,
   // Variable Table
   scopes: ScopeStack,
 
@@ -603,7 +603,6 @@ pub struct Interp<Ctx> where
   // Whether to continue execution in case of error.
   continue_on_error: bool,
 }
-
   }
 }
 
@@ -691,7 +690,7 @@ where
     #[inline]
     pub fn new(context: Ctx, command: Command<Ctx>, use_env: bool) -> Self {
         cfg_if::cfg_if! {
-          if #[cfg(feature = "wasm")] {
+          if #[cfg(feature = "std_buff")] {
             let mut interp = Self {
               command,
               recursion_limit: 1000,
