@@ -13,7 +13,7 @@ pub use crate::commands::{
 pub use crate::{
     check_args, gen_command, gen_subcommand,
     interp::{Command, CommandType, Interp},
-    molt_err, molt_ok,
+    join_helps, join_helps_subcmd, join_strings, molt_err, molt_err_help, molt_ok,
     test_harness::{test_cmd, test_harness, TestCtx},
 };
 

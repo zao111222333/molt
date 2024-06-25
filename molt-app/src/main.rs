@@ -32,9 +32,14 @@ fn main() {
                             (_PCLEAR, cmd_pclear)
                         ],
                         // embedded commands
-                        [("ident", cmd_ident), ("measure", measure_cmd), ("ok", cmd_ok)]
+                        [
+                            ("ident", "", cmd_ident, ""),
+                            ("measure", "", measure_cmd, ""),
+                            ("ok", "", cmd_ok, "")
+                        ]
                     ),
                     true,
+                    "molt-bench",
                 );
                 // NEXT, install the test commands into the interpreter.
 
@@ -67,12 +72,13 @@ fn main() {
                             // TODO: Developer Tools
                             (_PARSE, cmd_parse),
                             (_PDUMP, cmd_pdump),
-                            (_PCLEAR, cmd_pclear)
+                            (_PCLEAR, cmd_pclear),
                         ],
                         // embedded commands
-                        [("test", test_cmd)]
+                        [("test", "", test_cmd, "")]
                     ),
                     true,
+                    "molt-test",
                 );
                 if test_harness(&mut interp, &args[2..]).is_ok() {
                     std::process::exit(0);

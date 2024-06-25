@@ -24,7 +24,6 @@
 // #![doc(html_logo_url = "https://github.com/wduquette/molt/raw/master/MoltLogo.png")]
 
 pub use crate::types::*;
-
 mod commands;
 pub mod dict;
 mod eval_ptr;

@@ -472,6 +472,11 @@ impl Exception {
             error_data: Some(data),
         }
     }
+    pub fn to_help(&mut self) {
+        if let Some(data) = self.error_data.as_mut() {
+            data.is_new = false;
+        }
+    }
 
     /// Creates an `Error` exception with the given error code and message.  An
     /// error code is a `MoltList` that indicates the nature of the error.  Standard TCL
@@ -658,6 +663,7 @@ impl ErrorData {
     // Creates a rethrown ErrorData given the error code and error info.
     // The error data is marked as not-new, meaning that the stack_trace has
     // been initialized with a partial stack trace, not just the first error message.
+    #[inline]
     fn rethrow(error_code: Value, error_info: &str) -> Self {
         Self {
             error_code,
@@ -667,21 +673,25 @@ impl ErrorData {
     }
 
     /// Returns the error code.
+    #[inline]
     pub fn error_code(&self) -> Value {
         self.error_code.clone()
     }
 
     /// Whether this has just been created, or the stack trace has been extended.
+    #[inline]
     pub(crate) fn is_new(&self) -> bool {
         self.is_new
     }
 
     /// Returns the human-readable stack trace as a string.
+    #[inline]
     pub fn error_info(&self) -> Value {
         Value::from(self.stack_trace.join("\n"))
     }
 
     /// Adds to the stack trace, which, having been extended, is no longer new.
+    #[inline]
     pub(crate) fn add_info(&mut self, info: &str) {
         self.stack_trace.push(info.into());
         self.is_new = false;

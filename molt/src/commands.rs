@@ -77,9 +77,30 @@ pub fn cmd_append<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
 }
 
 /// # array *subcommand* ?*arg*...?
+///
+/// https://www.tcl.tk/man/tcl8.6/TclCmd/array.htm
 pub fn cmd_array<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
-    let f = gen_subcommand!(
-        Ctx,
+    // cfg_if::cfg_if! {
+    //     if #[cfg(feature = "native_subcmd_help")] {
+    //         let f = gen_subcommand!(
+    //             Ctx,
+    //             1,
+    //             [
+    //                 ("anymore", "    ", cmd_todo, "[TODO] array anymore arrayName searchId"),
+    //                 ("donesearch", " ", cmd_todo, "[TODO] array donesearch arrayName searchId"),
+    //                 ("exists", "     ", cmd_array_exists,"array exists arrayName"),
+    //                 ("get", "        ", cmd_array_get,   "array get arrayName ?pattern?"),
+    //                 ("names", "      ", cmd_array_names, "array names arrayName ?mode? ?pattern?"),
+    //                 ("nextelement", "", cmd_todo, "[TODO] array nextelement arrayName searchId"),
+    //                 ("set", "        ", cmd_array_set,   "array set arrayName list"),
+    //                 ("size", "       ", cmd_array_size,  "array size arrayName"),
+    //                 ("startsearch", "", cmd_todo, "[TODO] array startsearch arrayName"),
+    //                 ("statistics", " ", cmd_todo, "[TODO] array statistics arrayName"),
+    //                 ("unset", "      ", cmd_array_unset, "array unset arrayName ?pattern?"),
+    //             ],
+    //         );
+    //     }else{
+    let f = _gen_subcommand_generic!(
         1,
         [
             ("exists", cmd_array_exists),
@@ -234,9 +255,42 @@ pub fn cmd_continue<Ctx>(_interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResul
 }
 
 /// # dict *subcommand* ?*arg*...?
+///
+/// https://www.tcl.tk/man/tcl8.6/TclCmd/dict.htm
 pub fn cmd_dict<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
-    let f = gen_subcommand!(
-        Ctx,
+    // cfg_if::cfg_if! {
+    //     if #[cfg(feature = "native_subcmd_help")] {
+    //         let f = gen_subcommand!(
+    //             Ctx,
+    //             1,
+    //             [
+    //                 ("append", " ", cmd_todo, "[TODO] dict append dictionaryVariable key ?string ...?"),
+    //                 ("create", " ", cmd_dict_new,"dict create ?key value ...?"),
+    //                 ("exists", " ", cmd_dict_exists,"dict exists dictionaryValue key ?key ...?"),
+    //                 ("filter", " ", cmd_todo, "[TODO] dict filter dictionaryValue filterType arg ?arg ...?"),
+    //                 // dict filter dictionaryValue key ?globPattern ...?
+    //                 // dict filter dictionaryValue script {keyVariable valueVariable} script
+    //                 // dict filter dictionaryValue value ?globPattern ...?
+    //                 ("for", "    ", cmd_todo, "[TODO] dict for {keyVariable valueVariable} dictionaryValue body"),
+    //                 ("get", "    ", cmd_dict_get,"dict get dictionaryValue ?key ...?"),
+    //                 ("incr", "   ", cmd_todo,"[TODO] dict incr dictionaryVariable key ?increment?"),
+    //                 ("info", "   ", cmd_todo,"[TODO] dict info dictionaryValue"),
+    //                 ("keys", "   ", cmd_dict_keys,"dict keys dictionaryValue ?globPattern?"),
+    //                 ("lappend", "", cmd_todo,"[TODO] dict lappend dictionaryVariable key ?value ...?"),
+    //                 ("map", "    ", cmd_todo,"[TODO] dict map {keyVariable valueVariable} dictionaryValue body"),
+    //                 ("merge", "  ", cmd_todo,"[TODO] dict merge ?dictionaryValue ...?"),
+    //                 ("remove", " ", cmd_dict_remove,"dict remove dictionaryValue ?key ...?"),
+    //                 ("replace", "", cmd_todo,"[TODO] dict replace dictionaryValue ?key value ...?"),
+    //                 ("set", "    ", cmd_dict_set,"dict set dictionaryVariable key ?key ...? value"),
+    //                 ("size", "   ", cmd_dict_size,"dict size dictionaryValue"),
+    //                 ("unset", "  ", cmd_dict_unset,"dict unset dictionaryVariable key ?key ...?"),
+    //                 ("update", " ", cmd_todo,"[TODO] dict update dictionaryVariable key varName ?key varName ...? body"),
+    //                 ("values", " ", cmd_dict_values,"dict values dictionaryValue ?globPattern?"),
+    //                 ("with", "   ", cmd_todo,"[TODO] dict with dictionaryVariable ?key ...? body"),
+    //             ],
+    //         );
+    //     }else{
+    let f = _gen_subcommand_generic!(
         1,
         [
             ("create", cmd_dict_new),
@@ -250,6 +304,9 @@ pub fn cmd_dict<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
             ("values", cmd_dict_values),
         ],
     );
+
+    //     }
+    // }
     f(interp, argv)
 }
 
@@ -660,8 +717,7 @@ pub fn cmd_incr<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
 
 /// # info *subcommand* ?*arg*...?
 pub fn cmd_info<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
-    let f = gen_subcommand!(
-        Ctx,
+    let f = _gen_subcommand_generic!(
         1,
         [
             ("args", cmd_info_args),
@@ -1045,23 +1101,57 @@ pub fn cmd_source<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
 }
 
 /// # string *subcommand* ?*arg*...?
+///
+/// https://www.tcl.tk/man/tcl8.6/TclCmd/string.htm
 pub fn cmd_string<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
-    let f = gen_subcommand!(
-        Ctx,
+    // cfg_if::cfg_if! {
+    //     if #[cfg(feature = "native_subcmd_help")] {
+    //         let f = gen_subcommand!(
+    //             Ctx,
+    //             1,
+    //             [
+    //                 ("cat","       ", cmd_string_cat,"string cat ?string1? ?string2...?"),
+    //                 ("compare","   ", cmd_string_compare,"string compare ?-nocase? ?-length length? string1 string2"),
+    //                 ("equal","     ", cmd_string_equal,"string equal ?-nocase? ?-length length? string1 string2"),
+    //                 ("first","     ", cmd_string_first,"string first needleString haystackString ?startIndex?"),
+    //                 ("index","     ", cmd_todo,"string index string charIndex"),
+    //                 ("is","        ", cmd_todo,"[TODO] string is class ?-strict? ?-failindex varname? string"),
+    //                 ("last","      ", cmd_string_last,"string last needleString haystackString ?lastIndex?"),
+    //                 ("length","    ", cmd_string_length,"string length string"),
+    //                 ("map","       ", cmd_string_map,"string map ?-nocase? mapping string"),
+    //                 ("match","     ", cmd_todo,"[TODO] string match ?-nocase? pattern string"),
+    //                 ("range","     ", cmd_string_range,"string range string first last"),
+    //                 ("repeat","    ", cmd_todo,"[TODO] string repeat string count"),
+    //                 ("replace","   ", cmd_todo,"[TODO] string replace string first last ?newstring?"),
+    //                 ("reverse","   ", cmd_todo,"[TODO] string reverse string"),
+    //                 ("tolower","   ", cmd_string_tolower,"string tolower string ?first? ?last?"),
+    //                 ("totitle","   ", cmd_todo,"[TODO] string totitle string ?first? ?last?"),
+    //                 ("toupper","   ", cmd_string_toupper,"string toupper string ?first? ?last?"),
+    //                 ("trim","      ", cmd_string_trim,"string trim string ?chars?"),
+    //                 ("trimleft","  ", cmd_string_trim,"string trimleft string ?chars?"),
+    //                 ("trimright"," ", cmd_string_trim,"string trimright string ?chars?"),
+    //                 ("bytelength","", cmd_todo,"[TODO] string bytelength string"),
+    //                 ("wordend","   ", cmd_todo,"[TODO] string wordend string charIndex"),
+    //                 ("wordstart"," ", cmd_todo,"[TODO] string wordstart string charIndex"),
+    //             ],
+    //         );
+
+    //     }else{
+    let f = _gen_subcommand_generic!(
         1,
         [
             ("cat", cmd_string_cat),
             ("compare", cmd_string_compare),
             ("equal", cmd_string_equal),
             ("first", cmd_string_first),
-            // ("index", cmd_string_todo),
+            // ("index", cmd_todo),
             ("last", cmd_string_last),
             ("length", cmd_string_length),
             ("map", cmd_string_map),
             ("range", cmd_string_range),
-            // ("replace", cmd_string_todo),
-            // ("repeat", cmd_string_todo),
-            // ("reverse", cmd_string_todo),
+            // ("replace", cmd_todo),
+            // ("repeat", cmd_todo),
+            // ("reverse", cmd_todo),
             ("tolower", cmd_string_tolower),
             ("toupper", cmd_string_toupper),
             ("trim", cmd_string_trim),
@@ -1069,12 +1159,13 @@ pub fn cmd_string<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
             ("trimright", cmd_string_trim),
         ],
     );
+    //     }
+    // }
     f(interp, argv)
 }
 
-/// Temporary: stub for string subcommands.
-#[allow(unused)]
-pub fn cmd_string_todo<Ctx>(interp: &mut Interp<Ctx>, _argv: &[Value]) -> MoltResult {
+/// TODO cmds
+pub fn cmd_todo<Ctx>(interp: &mut Interp<Ctx>, _argv: &[Value]) -> MoltResult {
     molt_err!("TODO")
 }
 
@@ -1304,7 +1395,7 @@ pub fn cmd_string_map<Ctx>(_interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltRes
     let mut result = String::new();
     let mut skip = 0;
 
-    for (i, c) in s.char_indices() {
+    for (i, C) in s.char_indices() {
         if skip > 0 {
             skip -= 1;
             continue;
@@ -1329,7 +1420,7 @@ pub fn cmd_string_map<Ctx>(_interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltRes
         }
 
         if !matched {
-            result.push(c);
+            result.push(C);
         }
     }
 

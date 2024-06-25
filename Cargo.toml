@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.4.1"
+version = "0.4.2"
 edition = "2021"
 license = "MIT"
 authors = ["Will Duquette <will@wjduquette.com>", "Zizheng Guo <gzz_2000@126.com>", "Junzhuo Zhou <zhou@junzhuo.site>"]
@@ -10,14 +10,17 @@ keywords = ["language", "script", "scripting", "tcl"]
 documentation = "https://docs.rs/molt-forked"
 
 [workspace]
+resolver = "2"
 members = [
     "molt",
     "molt-shell",
     "molt-wasm",
+    "molt-wasm/demo",
     "molt-app",
 ]
 [workspace.dependencies]
 molt-forked = { path = "molt" }
+molt-wasm-demo = { path = "molt-wasm/demo" }
 
 [profile.release]
 opt-level = 3

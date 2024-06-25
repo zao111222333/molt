@@ -23,9 +23,10 @@ fn test_tcl_tests() {
                 (_PCLEAR, cmd_pclear)
             ],
             // embedded commands
-            [("test", test_cmd)]
+            [("test", "", test_cmd, "")]
         ),
         true,
+        "",
     );
     interp.set_recursion_limit(200);
 

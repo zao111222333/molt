@@ -12,13 +12,11 @@ documentation.workspace = true
 
 [dependencies]
 molt-forked = { path = "../molt",features = ["wasm"] }
-log = "0.4.6"
 web-sys = { version = "0.3", features = ["Element"] }
 wasm-logger = "0.2"
 gloo = { version = "0.11", features = ["events"] }
 yew = { version = "0.21", features = ["csr"] }
 yew_icons = {version = "0.8", features = [
     "BootstrapCheckLg",
-    "BootstrapGithub",
     "FontAwesomeSolidXmark",
 ]}

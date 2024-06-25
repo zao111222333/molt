@@ -1,4 +1,4 @@
-# Wasm Yew Minimal
+# Demo: WASM TCL Terminal
 
 ## Prerequisites
 

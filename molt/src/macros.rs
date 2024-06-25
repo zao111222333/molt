@@ -103,6 +103,20 @@ macro_rules! molt_err {
     )
 }
 
+#[macro_export]
+macro_rules! molt_err_help {
+    ($arg:expr) => {{
+      let mut e = $crate::Exception::molt_err($crate::Value::from($arg));
+      e.to_help();
+      Err(e)
+    }};
+    ($($arg:tt)*) => {{
+      let mut e = $crate::Exception::molt_err($crate::Value::from(format!($($arg)*)));
+      e.to_help();
+      Err(e)
+    }}
+}
+
 /// Returns an `Error` `MoltResult` with a specific error code.  The error message is formatted
 /// as with `format!()`.
 ///
@@ -201,30 +215,115 @@ macro_rules! join_strings {
 /// See the implementation of the `array` command in `commands.rs` and the
 /// [module level documentation](index.html) for examples.
 #[macro_export]
-macro_rules! gen_subcommand {
-  ($ctx_type:ty, $subc:expr, [ $( ($native_name:tt, $native_func:expr) ),* $(,)?] $(,)?) => {
+macro_rules! _gen_subcommand_generic {
+  ($subc:expr, [ $( ($cmd_name:tt, $cmd_func:expr$(,)?) ),* $(,)?] $(,)?) => {
     {
       #[inline]
-      fn f<T:'static>(interp: &mut Interp<T>, argv: &[Value]) -> MoltResult {
+      fn f<Ctx:'static>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
         check_args($subc, argv, $subc + 1, 0, "subcommand ?arg ...?")?;
         let sub_name = argv[$subc].as_str();
         match sub_name {
           $(
-            $native_name => $native_func(interp, argv),
+            $cmd_name => $cmd_func(interp, argv),
           )*
-          _ => molt_err!("unknown or ambiguous subcommand \"{}\": must be {}.", sub_name, join_strings!( $($native_name,)* )),
+          _ => molt_err!("unknown or ambiguous subcommand \"{}\", must be:\n{}.", sub_name, join_strings!( $($cmd_name,)* )),
         }
       }
-      f as fn(&mut Interp<$ctx_type>, &[Value]) -> MoltResult
+      f
+    }
+  }
+}
+
+/// A Molt command that has subcommands is called an _ensemble_ command.  In Rust code,
+/// the ensemble is defined as an array of `Subcommand` structs, each one mapping from
+/// a subcommand name to the implementing [`CommandFunc`].  For more information,
+/// see the discussion of command definition in [The Molt Book] and the [`interp`] module.
+///
+/// The tuple fields are the subcommand's name and implementing [`CommandFunc`].
+///
+/// [The Molt Book]: https://wduquette.github.io/molt/
+/// [`interp`]: ../interp/index.html
+/// [`CommandFunc`]: type.CommandFunc.html
+///
+/// Calls a subcommand of the current command, looking up its name in an array of
+/// `Subcommand` tuples.
+///
+/// The subcommand, if found, is called with the same `context_ids` and `argv` as its
+/// parent ensemble.  `subc` is the index of the subcommand's name in the `argv` array;
+/// in most cases it will be `1`, but it is possible to define subcommands with
+/// subcommands of their own.  The `subcommands` argument is a borrow of an array of
+/// `Subcommand` records, each defining a subcommand's name and `CommandFunc`.
+///
+/// If the subcommand name is found in the array, the matching `CommandFunc` is called.
+/// otherwise, the error message gives the ensemble syntax.  If an invalid subcommand
+/// name was provided, the error message includes the valid options.
+///
+/// See the implementation of the `array` command in `commands.rs` and the
+/// [module level documentation](index.html) for examples.
+#[macro_export]
+macro_rules! gen_subcommand {
+  ($ctx_type:ty, $subc:expr, [ $( ($cmd_name:tt, $cmd_space:tt, $cmd_func:expr, $cmd_help:expr$(,)?) ),* $(,)?] $(,)?) => {
+    {
+      #[inline]
+      fn f(interp: &mut Interp<$ctx_type>, argv: &[Value]) -> MoltResult {
+        check_args($subc, argv, $subc + 1, 0, "subcommand ?arg ...?")?;
+        let sub_name = argv[$subc].as_str();
+        const HELP_MSG: &str = join_helps_subcmd!( $( [$cmd_name,$cmd_space,$cmd_help], )* );
+        match sub_name {
+          $(
+            $cmd_name => $cmd_func(interp, argv),
+          )*
+          "-help" => molt_ok!("usage:\n{}",HELP_MSG),
+          _ => molt_err_help!("unknown subcommand in \"{} {}\", usage:\n{}", argv[0..$subc].iter().map(|v|v.as_str()).collect::<Vec<&str>>().join(" "),sub_name,HELP_MSG ),
+        }
+      }
+      f
     }
   }
 }
 
 #[macro_export]
+macro_rules! join_helps_subcmd {
+  (  ) => {
+      ""
+  };
+  // Base case: single element, no trailing newline
+  ( [$first:expr, $second:expr, $third:expr]$(,)? ) => {
+      concat!("  ", $first, "  ", $second, $third, "\n  -help")
+  };
+  // Recursive case: multiple elements
+  ( [$first:expr, $second:expr, $third:expr], $( [$rest_first:expr, $rest_second:expr, $rest_third:expr] ),+$(,)? ) => {
+      concat!(
+        "  ", $first, "  ", $second, $third, "\n",
+        join_helps_subcmd!($( [$rest_first, $rest_second, $rest_third] ),+)
+      )
+  };
+}
+
+#[macro_export]
+macro_rules! join_helps {
+  (  ) => {
+      ""
+  };
+  // Base case: single element, no trailing newline
+  ( [$first:expr, $second:expr, $third:expr]$(,)? ) => {
+      concat!("  ", $first, "  ", $second, $third, "\n  help  [-all]")
+  };
+  // Recursive case: multiple elements
+  ( [$first:expr, $second:expr, $third:expr], $( [$rest_first:expr, $rest_second:expr, $rest_third:expr] ),+$(,)? ) => {
+      concat!(
+        "  ", $first, "  ", $second, $third, "\n",
+          join_helps!($( [$rest_first, $rest_second, $rest_third] ),+)
+      )
+  };
+}
+
+#[macro_export]
 macro_rules! gen_command {
-  ($ctx_type:ty, [ $( ($native_name:tt, $native_func:expr) ),* $(,)?], [ $( ($embedded_name:tt, $embedded_func:expr) ),* $(,)?] $(,)?) => {
+  ($ctx_type:ty, [ $( ($native_name:tt, $native_func:expr $(,)?) ),* $(,)?], [ $( ($embedded_name:tt, $embedded_space:tt, $embedded_func:expr, $embedded_help:tt $(,)?) ),* $(,)?] $(,)?) => {
     Command::new(
       {fn f(name: &str, interp: &mut Interp<$ctx_type>, argv: &[Value]) -> MoltResult {
+        const HELP_MSG: &str = join_helps!( $( [$embedded_name,$embedded_space,$embedded_help], )* );
         match name {
           // NOTICE: Default native commands
           _APPEND => cmd_append(interp, argv),
@@ -257,6 +356,18 @@ macro_rules! gen_command {
           _TIME => cmd_time(interp, argv),
           _UNSET => cmd_unset(interp, argv),
           _WHILE => cmd_while(interp, argv),
+          "help" => {
+            if let Some(v)= argv.get(1){
+              if v.as_str()=="-all"{
+                let proc_command_names = interp.proc_command_names();
+                if proc_command_names.is_empty(){
+                  return molt_ok!("usage of {}:\ntcl:\n  {}\n{}:\n{}", interp.name,interp.native_command_names(),interp.name,HELP_MSG);
+                }else{
+                  return molt_ok!("usage of {}:\ntcl:\n  {}\n{}:\n{}\nprocedure:\n  {}", interp.name,interp.native_command_names(),interp.name,HELP_MSG,proc_command_names);
+                }
+              }
+            }
+            molt_ok!("usage of {}:\n{}",interp.name,HELP_MSG)},
           // NOTICE: Extra native commands
           $(
             $native_name => $native_func(interp, argv),
@@ -270,7 +381,12 @@ macro_rules! gen_command {
             if let Some(proc) = interp.get_proc(other) {
               proc.clone().execute(interp, argv)
             } else {
-              molt_err!("invalid command name \"{}\"", name)
+              let proc_command_names = interp.proc_command_names();
+              if proc_command_names.is_empty(){
+                molt_err_help!("unknown command \"{}\", valid commands:\ntcl:\n  {}\n{}:\n{}", name,interp.native_command_names(),interp.name,HELP_MSG)
+              }else{
+                molt_err_help!("unknown command \"{}\", valid commands:\ntcl:\n  {}\n{}:\n{}\nprocedure:\n  {}", name,interp.native_command_names(),interp.name,HELP_MSG,proc_command_names)
+              }
             }
           }
         }

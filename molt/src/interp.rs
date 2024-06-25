@@ -481,6 +481,7 @@ pub struct Command<Ctx: 'static> {
     embedded_names: &'static [&'static str],
 }
 impl<Ctx> Command<Ctx> {
+    #[inline]
     pub fn new(
         fn_execute: fn(&str, &mut Interp<Ctx>, &[Value]) -> MoltResult,
         fn_type: fn(&str, &Interp<Ctx>) -> Option<CommandType>,
@@ -526,6 +527,7 @@ cfg_if::cfg_if! {
 pub struct Interp<Ctx> where
   Ctx: 'static,
 {
+  pub name: &'static str,
   // Command Table
   command: Command<Ctx>,
   procs: HashMap<String, Rc<Procedure>>,
@@ -582,6 +584,7 @@ pub struct Interp<Ctx> where
 pub struct Interp<Ctx> where
   Ctx: 'static,
 {
+  name: &'static str,
   // Command Table
   command: Command<Ctx>,
   procs: HashMap<String, Rc<Procedure>>,
@@ -649,7 +652,7 @@ impl Interp<()> {
             // embedded commands
             []
         );
-        Interp::new((), command, true)
+        Interp::new((), command, true, "default-app")
     }
 }
 
@@ -688,10 +691,16 @@ where
     /// ```
     ///
     #[inline]
-    pub fn new(context: Ctx, command: Command<Ctx>, use_env: bool) -> Self {
+    pub fn new(
+        context: Ctx,
+        command: Command<Ctx>,
+        use_env: bool,
+        name: &'static str,
+    ) -> Self {
         cfg_if::cfg_if! {
           if #[cfg(feature = "std_buff")] {
             let mut interp = Self {
+              name,
               command,
               recursion_limit: 1000,
               procs: HashMap::new(),
@@ -704,6 +713,7 @@ where
             };
           } else {
             let mut interp = Self {
+              name,
               recursion_limit: 1000,
               command,
               procs: HashMap::new(),
@@ -937,12 +947,12 @@ where
                         // FIRST, new error, an error from within a proc, or an error from
                         // within some other body (ignored).
                         if exception.is_new_error() {
-                            exception.add_error_info("    while executing");
+                            exception.add_error_info("while executing");
                             // TODO: Add command.  In standard TCL, this is the text of the command
                             // before interpolation; at present, we don't have that info in a
                             // convenient form.  For now, just convert the final words to a string.
                             exception.add_error_info(&format!(
-                                "\"{}\"",
+                                "  \"{}\"",
                                 &list_to_string(&words)
                             ));
                         }
@@ -1937,12 +1947,25 @@ where
     ///     println!("Found command: {}", name);
     /// }
     /// ```
+    #[inline]
     pub fn command_names(&self) -> MoltList {
         let mut vec: MoltList =
             self.command.native_names.iter().map(|&s| Value::from(s)).collect();
         vec.extend(self.command.embedded_names.iter().map(|&s| Value::from(s)));
         vec.extend(self.procs.keys().map(Value::from));
         vec
+    }
+    #[inline]
+    pub fn native_command_names(&self) -> String {
+        self.command.native_names.join(", ")
+    }
+    #[inline]
+    pub fn proc_command_names(&self) -> String {
+        self.procs
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<&str>>()
+            .join(", ")
     }
 
     /// Returns the body of the named procedure, or an error if the name doesn't
@@ -1952,7 +1975,7 @@ where
         match (self.command.fn_type)(cmd_name, self) {
             Some(CommandType::Native) => molt_ok!("native"),
             Some(CommandType::Proc) => molt_ok!("proc"),
-            Some(CommandType::Embedded) => molt_ok!("embedded"),
+            Some(CommandType::Embedded) => molt_ok!(self.name),
             None => molt_err!("\"{}\" isn't a command", cmd_name),
         }
     }
@@ -2424,12 +2447,13 @@ mod tests {
                     // TODO: Developer Tools
                     (_PARSE, cmd_parse),
                     (_PDUMP, cmd_pdump),
-                    (_PCLEAR, cmd_pclear)
+                    (_PCLEAR, cmd_pclear),
                 ],
                 // embedded commands
-                [("dummy", dummy_cmd), ("dummy2", dummy_cmd)]
+                [("dummy", " ", dummy_cmd, ""), ("dummy2", "", dummy_cmd, ""),],
             ),
             true,
+            "",
         );
     }
 

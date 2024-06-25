@@ -3,16 +3,16 @@
 
 <head>
     <meta charset="utf-8" />
-    <title>tcl terminal</title>
+    <title>Demo: WASM TCL Terminal</title>
     <link rel="stylesheet" href="./style-ff7eb470aafbaa28.css" integrity="sha384&#x2D;KJURP7faCuE0YGcUUdAL76CsJSrXZjRzWYG6TxwDNGk&#x2B;vvgrW48fEGR4Olh8AscD"/>
 
-<link rel="modulepreload" href="./molt-wasm-88edc01fc7f0f4c6.js" crossorigin=anonymous integrity="sha384-e4tiY+Z448Mc7DTAeiHhxPewVvT7fPgEmvkO2sIee7/fMQq6mf12LWpf8QPRO158">
-<link rel="preload" href="./molt-wasm-88edc01fc7f0f4c6_bg.wasm" crossorigin=anonymous integrity="sha384-JE+21VPyloIOTkFLD6eKTvttINoB9Eek1Y5R0Juk6d0vHgWAkyxKVJ80jn6HCNM4" as="fetch" type="application/wasm"></head>
+<link rel="modulepreload" href="./molt-wasm-demo-d55f7dde164534d2.js" crossorigin=anonymous integrity="sha384-kk322+jpY7Q9xEbnaQBEVfLdCWaR9q66FDyrxzvfSebd9EOafTeU9X96HamPjxsk">
+<link rel="preload" href="./molt-wasm-demo-d55f7dde164534d2_bg.wasm" crossorigin=anonymous integrity="sha384-tvMcU+XmJK2Ftb4P0OHcapzS1H6pxYg+nsEOyMfPrio/hs+eDYE8V+wt3oDiR7kC" as="fetch" type="application/wasm"></head>
 
 <body>
 <script type="module">
-import init, * as bindings from './molt-wasm-88edc01fc7f0f4c6.js';
-const wasm = await init('./molt-wasm-88edc01fc7f0f4c6_bg.wasm');
+import init, * as bindings from './molt-wasm-demo-d55f7dde164534d2.js';
+const wasm = await init('./molt-wasm-demo-d55f7dde164534d2_bg.wasm');
 
 
 window.wasmBindings = bindings;
