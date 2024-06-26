@@ -191,8 +191,8 @@ impl Component for App {
                 if previous_is_uncompleted {
                     let previous = Rc::make_mut(&mut self.interp.context.hist).pop();
                     if let Some((_, previous_cmd, previous_out)) = previous {
-                        // If uncompleted continue with nothing, then just return error
                         if cmd.trim().is_empty() {
+                            // If uncompleted continue with nothing, then just return error
                             Rc::make_mut(&mut self.interp.context.hist).push((
                                 RunState::Err,
                                 previous_cmd,
