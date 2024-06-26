@@ -1,13 +1,13 @@
 [package]
 name = "molt-wasm-demo"
 description = "Demo of molt-wasm"
-version = "0.4.4"
+version = "0.4.5"
 edition = "2021"
 authors = ["Junzhuo Zhou <zhou@junzhuo.site>"]
 
 [dependencies]
-# molt-wasm = "0.4.4"
-molt-wasm = { path = "../../molt-wasm" }
+molt-wasm = "0.4.5"
+# molt-wasm = { path = ".." }
 log = "0.4.6"
 web-sys = { version = "0.3", features = ["Element"] }
 wasm-logger = "0.2"
