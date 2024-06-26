@@ -439,7 +439,6 @@
 //! [`CommandFunc`]: ../types/type.CommandFunc.html
 //! [`Value`]: ../value/index.html
 //! [`Interp`]: struct.Interp.html
-use crate::check_args;
 use crate::dict::dict_new;
 use crate::expr;
 use crate::gen_command;

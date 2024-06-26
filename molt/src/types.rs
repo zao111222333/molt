@@ -23,7 +23,6 @@
 //! [`Value`]: ../value/index.html
 //! [`interp`]: interp/index.html
 
-use crate::interp::Interp;
 pub use crate::value::Value;
 use indexmap::IndexMap;
 use std::fmt;
@@ -139,7 +138,6 @@ pub enum ResultCode {
     /// explicitly, unless implementing application-specific control structures.  See
     /// The Molt Book documentation for the `return` and `catch` command for the semantics.
     Continue,
-
     /// A mechanism for defining application-specific result codes.
     /// Clients will rarely need to interact with or reference this result code
     /// explicitly, unless implementing application-specific control structures. See
@@ -244,7 +242,9 @@ impl ResultCode {
 pub struct Exception {
     /// The kind of exception
     code: ResultCode,
-
+    /// Require input in interact mode
+    /// equal to Error otherwise
+    uncompleted: bool,
     /// The result value
     value: Value,
 
@@ -279,16 +279,21 @@ impl Exception {
     ///    }
     /// }
     /// ```
+    #[inline]
     pub fn is_error(&self) -> bool {
         self.code == ResultCode::Error
     }
-
+    #[inline]
+    pub fn is_uncompleted(&self) -> bool {
+        self.uncompleted
+    }
     /// Returns the exception's error code, only if `is_error()`.
     /// exception.
     ///
     /// # Panics
     ///
     /// Panics if the exception is not an error.
+    #[inline]
     pub fn error_code(&self) -> Value {
         self.error_data().expect("exception is not an error").error_code()
     }
@@ -299,6 +304,7 @@ impl Exception {
     /// # Panics
     ///
     /// Panics if the exception is not an error.
+    #[inline]
     pub fn error_info(&self) -> Value {
         self.error_data().expect("exception is not an error").error_info()
     }
@@ -327,6 +333,7 @@ impl Exception {
     /// ```
     ///
     /// [`ErrorData`]: struct.ErrorData.html
+    #[inline]
     pub fn error_data(&self) -> Option<&ErrorData> {
         self.error_data.as_ref()
     }
@@ -361,6 +368,7 @@ impl Exception {
     ///    }
     /// }
     /// ```
+    #[inline]
     pub fn code(&self) -> ResultCode {
         self.code
     }
@@ -389,6 +397,7 @@ impl Exception {
     ///    }
     /// }
     /// ```
+    #[inline]
     pub fn value(&self) -> Value {
         self.value.clone()
     }
@@ -396,6 +405,7 @@ impl Exception {
     /// Gets the exception's level.  The "level" code is set by the `return` command's
     /// `-level` option.  See The Molt Book's `return` page for the semantics.  Client code
     /// should rarely if ever need to refer to this.
+    #[inline]
     pub fn level(&self) -> usize {
         self.level
     }
@@ -404,6 +414,7 @@ impl Exception {
     /// "next" code is set by the `return` command's `-code` option.  See The Molt Book's
     /// `return` page for the semantics.  Client code should rarely if ever need to refer
     /// to this.
+    #[inline]
     pub fn next_code(&self) -> ResultCode {
         self.next_code
     }
@@ -439,6 +450,7 @@ impl Exception {
     /// # Panics
     ///
     /// Panics if the exception is not an error exception.
+    #[inline]
     pub fn add_error_info(&mut self, line: &str) {
         if let Some(data) = &mut self.error_data {
             data.add_info(line);
@@ -461,6 +473,7 @@ impl Exception {
     /// ```
     ///
     /// [`molt_err`]: ../macro.molt_err.html
+    #[inline]
     pub fn molt_err(msg: Value) -> Self {
         let data = ErrorData::new(Value::from("NONE"), msg.as_str());
 
@@ -470,12 +483,18 @@ impl Exception {
             level: 0,
             next_code: ResultCode::Error,
             error_data: Some(data),
+            uncompleted: false,
         }
     }
+    #[inline]
     pub fn to_help(&mut self) {
         if let Some(data) = self.error_data.as_mut() {
             data.is_new = false;
         }
+    }
+    #[inline]
+    pub fn to_uncomplete(&mut self) {
+        self.uncompleted = true;
     }
 
     /// Creates an `Error` exception with the given error code and message.  An
@@ -506,6 +525,7 @@ impl Exception {
             level: 0,
             next_code: ResultCode::Error,
             error_data: Some(data),
+            uncompleted: false,
         }
     }
 
@@ -523,6 +543,7 @@ impl Exception {
             level: 1,
             next_code: ResultCode::Okay,
             error_data: None,
+            uncompleted: false,
         }
     }
 
@@ -545,6 +566,7 @@ impl Exception {
             level,
             next_code,
             error_data: None,
+            uncompleted: false,
         }
     }
 
@@ -573,6 +595,7 @@ impl Exception {
             level,
             next_code: ResultCode::Error,
             error_data: Some(data),
+            uncompleted: false,
         }
     }
 
@@ -589,6 +612,7 @@ impl Exception {
             level: 0,
             next_code: ResultCode::Break,
             error_data: None,
+            uncompleted: false,
         }
     }
 
@@ -605,6 +629,7 @@ impl Exception {
             level: 0,
             next_code: ResultCode::Continue,
             error_data: None,
+            uncompleted: false,
         }
     }
 

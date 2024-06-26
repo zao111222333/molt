@@ -1165,7 +1165,7 @@ pub fn cmd_string<Ctx>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
 }
 
 /// TODO cmds
-pub fn cmd_todo<Ctx>(interp: &mut Interp<Ctx>, _argv: &[Value]) -> MoltResult {
+pub fn cmd_todo<Ctx>(_interp: &mut Interp<Ctx>, _argv: &[Value]) -> MoltResult {
     molt_err!("TODO")
 }
 
@@ -1395,7 +1395,7 @@ pub fn cmd_string_map<Ctx>(_interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltRes
     let mut result = String::new();
     let mut skip = 0;
 
-    for (i, C) in s.char_indices() {
+    for (i, c) in s.char_indices() {
         if skip > 0 {
             skip -= 1;
             continue;
@@ -1420,7 +1420,7 @@ pub fn cmd_string_map<Ctx>(_interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltRes
         }
 
         if !matched {
-            result.push(C);
+            result.push(c);
         }
     }
 

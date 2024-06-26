@@ -259,7 +259,7 @@ pub(crate) fn parse_braced_word(ctx: &mut EvalPtr) -> Result<Word, Exception> {
         }
     }
 
-    molt_err!("missing close-brace")
+    molt_err_uncompleted!("missing close-brace")
 }
 
 /// Parses a quoted word, handling backslash, variable, and command substitution. It's
@@ -368,7 +368,7 @@ fn parse_brackets(ctx: &mut EvalPtr) -> Result<Script, Exception> {
         if ctx.next_is(']') {
             ctx.next();
         } else {
-            return molt_err!("missing close-bracket");
+            return molt_err_uncompleted!("missing close-bracket");
         }
     }
 
@@ -404,7 +404,7 @@ pub(crate) fn parse_varname(ctx: &mut EvalPtr) -> Result<Word, Exception> {
         ctx.skip_while(|ch| *ch != '}');
 
         if ctx.at_end() {
-            return molt_err!("missing close-brace for variable name");
+            return molt_err_uncompleted!("missing close-brace for variable name");
         }
 
         let var_name = parse_varname_literal(ctx.token(start));
@@ -629,7 +629,7 @@ mod tests {
         assert_eq!(cmds[0].words, vec![Word::Value(Value::from("a"))]);
         assert_eq!(cmds[1].words, vec![Word::Value(Value::from("b"))]);
 
-        assert_eq!(parse("a {"), molt_err!("missing close-brace"));
+        assert_eq!(parse("a {"), molt_err_uncompleted!("missing close-brace"));
     }
 
     #[test]
@@ -710,9 +710,9 @@ mod tests {
         );
 
         // Strings with missing close-brace
-        assert_eq!(pbrace("{abc"), molt_err!("missing close-brace"));
+        assert_eq!(pbrace("{abc"), molt_err_uncompleted!("missing close-brace"));
 
-        assert_eq!(pbrace("{a{b}c"), molt_err!("missing close-brace"));
+        assert_eq!(pbrace("{a{b}c"), molt_err_uncompleted!("missing close-brace"));
     }
 
     fn pbrace(input: &str) -> Result<(Word, String), Exception> {
@@ -892,7 +892,7 @@ mod tests {
             ]
         );
 
-        assert_eq!(pbrack("[incomplete"), molt_err!("missing close-bracket"));
+        assert_eq!(pbrack("[incomplete"), molt_err_uncompleted!("missing close-bracket"));
     }
 
     fn pbrack(input: &str) -> Result<Script, Exception> {
@@ -920,7 +920,10 @@ mod tests {
 
         // Braced var names
         assert_eq!(pvar("${a}b"), Ok((Word::VarRef("a".into()), "b".into())));
-        assert_eq!(pvar("${ab"), molt_err!("missing close-brace for variable name"));
+        assert_eq!(
+            pvar("${ab"),
+            molt_err_uncompleted!("missing close-brace for variable name")
+        );
 
         // Braced var names with arrays
         assert_eq!(

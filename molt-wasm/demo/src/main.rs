@@ -1,4 +1,4 @@
-use molt_wasm::{molt::prelude::*, Terminal};
+use molt_wasm::{molt::prelude::*, RunState, Terminal};
 use std::{mem, rc::Rc};
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
@@ -31,11 +31,13 @@ impl App {
         let out = self.interp.eval(&cmd);
         let mut outs = mem::take(&mut self.interp.std_buff);
         outs.push(out);
-        Rc::make_mut(&mut self.interp.context.hist).push((cmd.trim().into(), outs));
+        Rc::make_mut(&mut self.interp.context.hist)
+            .push(Terminal::to_hist(cmd.trim().into(), outs));
     }
 }
 pub enum AppMsg {
-    RunCmd(String),
+    RunCmd(String, bool),
+    ToggleDark,
 }
 
 pub fn cmd_square(interp: &mut Interp<AppCtx>, argv: &[Value]) -> MoltResult {
@@ -146,9 +148,10 @@ const cmd_brower: fn(&mut Interp<AppCtx>, &[Value]) -> Result<Value, Exception> 
 
 pub struct AppCtx {
     num: usize,
-    hist: Rc<Vec<(String, Vec<Result<Value, Exception>>)>>,
+    pub hist: Rc<Vec<(RunState, String, Html)>>,
 }
 pub struct App {
+    darkmode: bool,
     interp: Interp<AppCtx>,
 }
 
@@ -175,7 +178,7 @@ impl Component for App {
             false,
             "molt-wasm-demo",
         );
-        let mut app = Self { interp };
+        let mut app = Self { darkmode: true, interp };
         for cmd in INIT_CMDS {
             app.execute(cmd.into());
         }
@@ -184,7 +187,28 @@ impl Component for App {
 
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            AppMsg::RunCmd(cmd) => self.execute(cmd),
+            AppMsg::RunCmd(cmd, previous_is_uncompleted) => {
+                if previous_is_uncompleted {
+                    let previous = Rc::make_mut(&mut self.interp.context.hist).pop();
+                    if let Some((_, previous_cmd, previous_out)) = previous {
+                        // If uncompleted continue with nothing, then just return error
+                        if cmd.trim().is_empty() {
+                            Rc::make_mut(&mut self.interp.context.hist).push((
+                                RunState::Err,
+                                previous_cmd,
+                                previous_out,
+                            ));
+                        } else {
+                            self.execute(previous_cmd + "\n" + &cmd)
+                        }
+                    } else {
+                        self.execute(cmd)
+                    }
+                } else {
+                    self.execute(cmd)
+                }
+            }
+            AppMsg::ToggleDark => self.darkmode = !self.darkmode,
         }
         true
     }
@@ -193,12 +217,16 @@ impl Component for App {
         html! {
             <>
                 <div>
-                <a href="https://github.com/zao111222333/molt-forked/tree/master/molt-wasm/demo"><code>{"code"}</code><Icon icon_id={IconId::BootstrapGithub} height={"10px".to_owned()} width={"15px".to_owned()}/></a>
-                <code>{" The context number is "}</code><code style="color:red;">{self.interp.context.num}</code><code>{", run `square [number]` to change it"}</code>
+                    <div onclick={ctx.link().callback(|_|AppMsg::ToggleDark)}>
+                        <Icon icon_id={if self.darkmode{IconId::FeatherMoon}else{IconId::FeatherSun}} height={"20px".to_owned()} width={"20px".to_owned()}/>
+                    </div>
+                    <a href="https://github.com/zao111222333/molt-forked/tree/master/molt-wasm/demo"><code>{"code"}</code><Icon icon_id={IconId::BootstrapGithub} height={"10px".to_owned()} width={"15px".to_owned()}/></a>
+                    <code>{" The context number is "}</code><code style="color:red;">{self.interp.context.num}</code><code>{", run `square [number]` to change it"}</code>
                 </div>
                 <Terminal
+                    class={if self.darkmode{ "terminal dark" }else{ "terminal" }}
                     hist={self.interp.context.hist.clone()}
-                    on_run_cmd={ctx.link().callback(AppMsg::RunCmd)}
+                    on_run_cmd={ctx.link().callback(|(cmd,previous_is_uncompleted)|AppMsg::RunCmd(cmd,previous_is_uncompleted))}
                 />
             </>
         }

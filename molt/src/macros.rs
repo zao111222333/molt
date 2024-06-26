@@ -117,6 +117,20 @@ macro_rules! molt_err_help {
     }}
 }
 
+#[macro_export]
+macro_rules! molt_err_uncompleted {
+    ($arg:expr) => {{
+      let mut e = $crate::Exception::molt_err($crate::Value::from($arg));
+      e.to_uncomplete();
+      Err(e)
+    }};
+    ($($arg:tt)*) => {{
+      let mut e = $crate::Exception::molt_err($crate::Value::from(format!($($arg)*)));
+      e.to_uncomplete();
+      Err(e)
+    }}
+}
+
 /// Returns an `Error` `MoltResult` with a specific error code.  The error message is formatted
 /// as with `format!()`.
 ///
@@ -219,7 +233,7 @@ macro_rules! _gen_subcommand_generic {
   ($subc:expr, [ $( ($cmd_name:tt, $cmd_func:expr$(,)?) ),* $(,)?] $(,)?) => {
     {
       #[inline]
-      fn f<Ctx:'static>(interp: &mut Interp<Ctx>, argv: &[Value]) -> MoltResult {
+      fn f<Ctx:'static>(interp: &mut $crate::prelude::Interp<Ctx>, argv: &[$crate::prelude::Value]) -> $crate::prelude::MoltResult {
         check_args($subc, argv, $subc + 1, 0, "subcommand ?arg ...?")?;
         let sub_name = argv[$subc].as_str();
         match sub_name {
@@ -265,7 +279,7 @@ macro_rules! gen_subcommand {
   ($ctx_type:ty, $subc:expr, [ $( ($cmd_name:tt, $cmd_space:tt, $cmd_func:expr, $cmd_help:expr$(,)?) ),* $(,)?] $(,)?) => {
     {
       #[inline]
-      fn f(interp: &mut Interp<$ctx_type>, argv: &[Value]) -> MoltResult {
+      fn f(interp: &mut $crate::prelude::Interp<$ctx_type>, argv: &[$crate::prelude::Value]) -> $crate::prelude::MoltResult {
         check_args($subc, argv, $subc + 1, 0, "subcommand ?arg ...?")?;
         let sub_name = argv[$subc].as_str();
         const HELP_MSG: &str = join_helps_subcmd!( $( [$cmd_name,$cmd_space,$cmd_help], )* );
@@ -273,7 +287,7 @@ macro_rules! gen_subcommand {
           $(
             $cmd_name => $cmd_func(interp, argv),
           )*
-          "-help" => molt_ok!("usage:\n{}",HELP_MSG),
+          "-help" => molt_ok!("usage of{}:\n{}",argv[0..$subc].iter().map(|v|v.as_str()).collect::<Vec<&str>>().join(" "),HELP_MSG),
           _ => molt_err_help!("unknown subcommand in \"{} {}\", usage:\n{}", argv[0..$subc].iter().map(|v|v.as_str()).collect::<Vec<&str>>().join(" "),sub_name,HELP_MSG ),
         }
       }
@@ -321,41 +335,41 @@ macro_rules! join_helps {
 #[macro_export]
 macro_rules! gen_command {
   ($ctx_type:ty, [ $( ($native_name:tt, $native_func:expr $(,)?) ),* $(,)?], [ $( ($embedded_name:tt, $embedded_space:tt, $embedded_func:expr, $embedded_help:tt $(,)?) ),* $(,)?] $(,)?) => {
-    Command::new(
-      {fn f(name: &str, interp: &mut Interp<$ctx_type>, argv: &[Value]) -> MoltResult {
+    $crate::prelude::Command::new(
+      {fn f(name: &str, interp: &mut $crate::prelude::Interp<$ctx_type>, argv: &[$crate::prelude::Value]) -> $crate::prelude::MoltResult {
         const HELP_MSG: &str = join_helps!( $( [$embedded_name,$embedded_space,$embedded_help], )* );
         match name {
           // NOTICE: Default native commands
-          _APPEND => cmd_append(interp, argv),
-          _ARRAY => cmd_array(interp, argv),
-          _ASSERT_EQ => cmd_assert_eq(interp, argv),
-          _BREAK => cmd_break(interp, argv),
-          _CATCH => cmd_catch(interp, argv),
-          _CONTINUE => cmd_continue(interp, argv),
-          _DICT => cmd_dict(interp, argv),
-          _ERROR => cmd_error(interp, argv),
-          _EXPR => cmd_expr(interp, argv),
-          _FOR => cmd_for(interp, argv),
-          _FOREACH => cmd_foreach(interp, argv),
-          _GLOBAL => cmd_global(interp, argv),
-          _IF => cmd_if(interp, argv),
-          _INCR => cmd_incr(interp, argv),
-          _INFO => cmd_info(interp, argv),
-          _JOIN => cmd_join(interp, argv),
-          _LAPPEND => cmd_lappend(interp, argv),
-          _LINDEX => cmd_lindex(interp, argv),
-          _LIST => cmd_list(interp, argv),
-          _LLENGTH => cmd_llength(interp, argv),
-          _PROC => cmd_proc(interp, argv),
-          _PUTS => cmd_puts(interp, argv),
-          _RENAME => cmd_rename(interp, argv),
-          _RETURN => cmd_return(interp, argv),
-          _SET => cmd_set(interp, argv),
-          _STRING => cmd_string(interp, argv),
-          _THROW => cmd_throw(interp, argv),
-          _TIME => cmd_time(interp, argv),
-          _UNSET => cmd_unset(interp, argv),
-          _WHILE => cmd_while(interp, argv),
+          $crate::prelude::_APPEND => $crate::prelude::cmd_append(interp, argv),
+          $crate::prelude::_ARRAY => $crate::prelude::cmd_array(interp, argv),
+          $crate::prelude::_ASSERT_EQ => $crate::prelude::cmd_assert_eq(interp, argv),
+          $crate::prelude::_BREAK => $crate::prelude::cmd_break(interp, argv),
+          $crate::prelude::_CATCH => $crate::prelude::cmd_catch(interp, argv),
+          $crate::prelude::_CONTINUE => $crate::prelude::cmd_continue(interp, argv),
+          $crate::prelude::_DICT => $crate::prelude::cmd_dict(interp, argv),
+          $crate::prelude::_ERROR => $crate::prelude::cmd_error(interp, argv),
+          $crate::prelude::_EXPR => $crate::prelude::cmd_expr(interp, argv),
+          $crate::prelude::_FOR => $crate::prelude::cmd_for(interp, argv),
+          $crate::prelude::_FOREACH => $crate::prelude::cmd_foreach(interp, argv),
+          $crate::prelude::_GLOBAL => $crate::prelude::cmd_global(interp, argv),
+          $crate::prelude::_IF => $crate::prelude::cmd_if(interp, argv),
+          $crate::prelude::_INCR => $crate::prelude::cmd_incr(interp, argv),
+          $crate::prelude::_INFO => $crate::prelude::cmd_info(interp, argv),
+          $crate::prelude::_JOIN => $crate::prelude::cmd_join(interp, argv),
+          $crate::prelude::_LAPPEND => $crate::prelude::cmd_lappend(interp, argv),
+          $crate::prelude::_LINDEX => $crate::prelude::cmd_lindex(interp, argv),
+          $crate::prelude::_LIST => $crate::prelude::cmd_list(interp, argv),
+          $crate::prelude::_LLENGTH => $crate::prelude::cmd_llength(interp, argv),
+          $crate::prelude::_PROC => $crate::prelude::cmd_proc(interp, argv),
+          $crate::prelude::_PUTS => $crate::prelude::cmd_puts(interp, argv),
+          $crate::prelude::_RENAME => $crate::prelude::cmd_rename(interp, argv),
+          $crate::prelude::_RETURN => $crate::prelude::cmd_return(interp, argv),
+          $crate::prelude::_SET => $crate::prelude::cmd_set(interp, argv),
+          $crate::prelude::_STRING => $crate::prelude::cmd_string(interp, argv),
+          $crate::prelude::_THROW => $crate::prelude::cmd_throw(interp, argv),
+          $crate::prelude::_TIME => $crate::prelude::cmd_time(interp, argv),
+          $crate::prelude::_UNSET => $crate::prelude::cmd_unset(interp, argv),
+          $crate::prelude::_WHILE => $crate::prelude::cmd_while(interp, argv),
           "help" => {
             if let Some(v)= argv.get(1){
               if v.as_str()=="-all"{
@@ -391,88 +405,88 @@ macro_rules! gen_command {
           }
         }
       }
-      f as fn(&str, &mut Interp<$ctx_type>, &[Value]) -> MoltResult
+      f as fn(&str, &mut $crate::prelude::Interp<$ctx_type>, &[$crate::prelude::Value]) -> $crate::prelude::MoltResult
       },
-      {fn f(name: &str, interp: &Interp<$ctx_type>) -> Option<CommandType> {
+      {fn f(name: &str, interp: &$crate::prelude::Interp<$ctx_type>) -> Option<$crate::prelude::CommandType> {
         match name {
-          _APPEND => Some(CommandType::Native),
-          _ARRAY => Some(CommandType::Native),
-          _ASSERT_EQ => Some(CommandType::Native),
-          _BREAK => Some(CommandType::Native),
-          _CATCH => Some(CommandType::Native),
-          _CONTINUE => Some(CommandType::Native),
-          _DICT => Some(CommandType::Native),
-          _ERROR => Some(CommandType::Native),
-          _EXPR => Some(CommandType::Native),
-          _FOR => Some(CommandType::Native),
-          _FOREACH => Some(CommandType::Native),
-          _GLOBAL => Some(CommandType::Native),
-          _IF => Some(CommandType::Native),
-          _INCR => Some(CommandType::Native),
-          _INFO => Some(CommandType::Native),
-          _JOIN => Some(CommandType::Native),
-          _LAPPEND => Some(CommandType::Native),
-          _LINDEX => Some(CommandType::Native),
-          _LIST => Some(CommandType::Native),
-          _LLENGTH => Some(CommandType::Native),
-          _PROC => Some(CommandType::Native),
-          _PUTS => Some(CommandType::Native),
-          _RENAME => Some(CommandType::Native),
-          _RETURN => Some(CommandType::Native),
-          _SET => Some(CommandType::Native),
-          _STRING => Some(CommandType::Native),
-          _THROW => Some(CommandType::Native),
-          _TIME => Some(CommandType::Native),
-          _UNSET => Some(CommandType::Native),
-          _WHILE => Some(CommandType::Native),
+          $crate::prelude::_APPEND => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_ARRAY => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_ASSERT_EQ => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_BREAK => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_CATCH => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_CONTINUE => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_DICT => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_ERROR => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_EXPR => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_FOR => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_FOREACH => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_GLOBAL => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_IF => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_INCR => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_INFO => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_JOIN => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_LAPPEND => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_LINDEX => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_LIST => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_LLENGTH => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_PROC => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_PUTS => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_RENAME => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_RETURN => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_SET => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_STRING => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_THROW => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_TIME => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_UNSET => Some($crate::prelude::CommandType::Native),
+          $crate::prelude::_WHILE => Some($crate::prelude::CommandType::Native),
           $(
-            $native_name => Some(CommandType::Native),
+            $native_name => Some($crate::prelude::CommandType::Native),
           )*
           $(
-            $embedded_name => Some(CommandType::Embedded),
+            $embedded_name => Some($crate::prelude::CommandType::Embedded),
           )*
           other => {
             if interp.contains_proc(other) {
-              Some(CommandType::Proc)
+              Some($crate::prelude::CommandType::Proc)
             } else {
               None
             }
           }
         }
       }
-      f as fn(&str, &Interp<$ctx_type>) -> Option<CommandType>
+      f as fn(&str, &$crate::prelude::Interp<$ctx_type>) -> Option<$crate::prelude::CommandType>
       },
       &[
-        _APPEND,
-        _ARRAY,
-        _ASSERT_EQ,
-        _BREAK,
-        _CATCH,
-        _CONTINUE,
-        _DICT,
-        _ERROR,
-        _EXPR,
-        _FOR,
-        _FOREACH,
-        _GLOBAL,
-        _IF,
-        _INCR,
-        _INFO,
-        _JOIN,
-        _LAPPEND,
-        _LINDEX,
-        _LIST,
-        _LLENGTH,
-        _PROC,
-        _PUTS,
-        _RENAME,
-        _RETURN,
-        _SET,
-        _STRING,
-        _THROW,
-        _TIME,
-        _UNSET,
-        _WHILE,
+        $crate::prelude::_APPEND,
+        $crate::prelude::_ARRAY,
+        $crate::prelude::_ASSERT_EQ,
+        $crate::prelude::_BREAK,
+        $crate::prelude::_CATCH,
+        $crate::prelude::_CONTINUE,
+        $crate::prelude::_DICT,
+        $crate::prelude::_ERROR,
+        $crate::prelude::_EXPR,
+        $crate::prelude::_FOR,
+        $crate::prelude::_FOREACH,
+        $crate::prelude::_GLOBAL,
+        $crate::prelude::_IF,
+        $crate::prelude::_INCR,
+        $crate::prelude::_INFO,
+        $crate::prelude::_JOIN,
+        $crate::prelude::_LAPPEND,
+        $crate::prelude::_LINDEX,
+        $crate::prelude::_LIST,
+        $crate::prelude::_LLENGTH,
+        $crate::prelude::_PROC,
+        $crate::prelude::_PUTS,
+        $crate::prelude::_RENAME,
+        $crate::prelude::_RETURN,
+        $crate::prelude::_SET,
+        $crate::prelude::_STRING,
+        $crate::prelude::_THROW,
+        $crate::prelude::_TIME,
+        $crate::prelude::_UNSET,
+        $crate::prelude::_WHILE,
         $(
             $native_name,
         )*

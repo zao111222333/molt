@@ -1145,7 +1145,7 @@ fn parse_and_eval_script<Ctx: 'static>(
         if ctx.next_is(']') {
             ctx.next();
         } else {
-            return molt_err!("missing close-bracket");
+            return molt_err_uncompleted!("missing close-bracket");
         }
     }
 

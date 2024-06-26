@@ -1462,7 +1462,7 @@ mod tests {
         assert!(val.as_script().is_ok());
 
         let val = Value::from("a {b");
-        assert_eq!(val.as_script(), molt_err!("missing close-brace"));
+        assert_eq!(val.as_script(), molt_err_uncompleted!("missing close-brace"));
     }
 
     #[test]

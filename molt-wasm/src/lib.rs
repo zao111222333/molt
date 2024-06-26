@@ -1,4 +1,4 @@
-use gloo::timers::callback::Timeout;
+use gloo::{console::debug, timers::callback::Timeout};
 // re-export molt_forked
 use molt::prelude::*;
 pub use molt_forked as molt;
@@ -14,11 +14,20 @@ pub struct Terminal {
     input_tmp: String,
     current_hist_idx: Option<usize>,
 }
+#[derive(Debug, PartialEq, Clone, Copy, Default)]
+pub enum RunState {
+    #[default]
+    Ok,
+    Err,
+    Uncompleted,
+}
 
 #[derive(Debug, Properties, PartialEq)]
 pub struct TerminalProp {
-    pub hist: Rc<Vec<(String, Vec<Result<Value, Exception>>)>>,
-    pub on_run_cmd: Callback<String>,
+    pub class: &'static str,
+    pub hist: Rc<Vec<(RunState, String, Html)>>,
+    // new input, last one is uncompleted
+    pub on_run_cmd: Callback<(String, bool)>,
 }
 
 pub enum TerminalMsg {
@@ -35,6 +44,32 @@ pub enum Key {
 }
 
 impl Terminal {
+    pub fn to_hist(
+        cmd_ctx: String,
+        outs: Vec<Result<Value, Exception>>,
+    ) -> (RunState, String, Html) {
+        let mut run_state = RunState::Ok;
+        let out_html = html! {
+            {for outs.iter().enumerate().map(
+                |(i,out)|{
+                    match out{
+                    Ok(s) => html!(<code class="stdout" style="margin:0px;white-space:pre-wrap;"> { s.to_string() }{if i==(outs.len()-1){html!()}else{html!(<br />)}}</code>),
+                    Err(s) => {
+                        run_state=RunState::Err;
+                        html!(<code class="stderr" style="margin:0px;white-space:pre-wrap;"> { s.error_info().to_string() }{if i==(outs.len()-1){html!()}else{html!(<br />)}}</code>)},
+                    }
+                }
+            )}
+        };
+        if run_state == RunState::Err {
+            if let Some(Err(e)) = outs.last() {
+                if e.is_uncompleted() {
+                    run_state = RunState::Uncompleted;
+                }
+            }
+        }
+        (run_state, cmd_ctx, out_html)
+    }
     fn input_div_cursor_to_end(&mut self) {
         if let Some(textarea) = self.input_div_ref.cast::<HtmlTextAreaElement>() {
             let length = self.input.chars().count() as u32;
@@ -65,8 +100,12 @@ impl Component for Terminal {
             TerminalMsg::KeyDown(key) => match key {
                 Key::Enter => {
                     let cmd = mem::take(&mut self.input);
-                    if !cmd.is_empty() {
-                        ctx.props().on_run_cmd.emit(cmd);
+                    if let Some((RunState::Uncompleted, _, _)) = ctx.props().hist.last() {
+                        ctx.props().on_run_cmd.emit((cmd, true));
+                    } else {
+                        if !cmd.is_empty() {
+                            ctx.props().on_run_cmd.emit((cmd, false));
+                        }
                     }
                     if let Some(element) = self.hist_div_ref.cast::<web_sys::Element>() {
                         Timeout::new(5 as u32, move || {
@@ -85,7 +124,7 @@ impl Component for Terminal {
                             self.input_tmp = mem::take(&mut self.input);
                         }
                         *i -= 1;
-                        if let Some((hist_cmd, _)) = ctx.props().hist.get(*i) {
+                        if let Some((_, hist_cmd, _)) = ctx.props().hist.get(*i) {
                             self.input = hist_cmd.clone();
                         }
                         self.input_div_cursor_to_end();
@@ -94,7 +133,7 @@ impl Component for Terminal {
                     None => {
                         let i = ctx.props().hist.len() - 1;
                         self.current_hist_idx = Some(i);
-                        if let Some((hist_cmd, _)) = ctx.props().hist.get(i) {
+                        if let Some((_, hist_cmd, _)) = ctx.props().hist.get(i) {
                             self.input_tmp = mem::take(&mut self.input);
                             self.input = hist_cmd.clone();
                         }
@@ -112,7 +151,7 @@ impl Component for Terminal {
                             true
                         } else {
                             *i += 1;
-                            if let Some((hist_cmd, _)) = ctx.props().hist.get(*i) {
+                            if let Some((_, hist_cmd, _)) = ctx.props().hist.get(*i) {
                                 self.input = hist_cmd.clone();
                             }
                             true
@@ -156,62 +195,55 @@ impl Component for Terminal {
     }
     fn view(&self, ctx: &Context<Self>) -> Html {
         html! {
-          <>
-          <ul ref={self.hist_div_ref.clone()}
-          style="text-wrap:nowrap;height:50vh;margin:0px; overflow-y: auto; padding:10px;padding-inline-start:5px;padding-inline-end:5px; background: #f0f0f0;overflow-y:auto;overflow-x:auto;">
-            { for ctx.props().hist.iter().map(|(cmd_ctx,outs)|{
-              let mut has_err = false;
-              let out_html = html!{
-                {for outs.iter().enumerate().map(
-                  |(i,out)|{
-                    match out{
-                      Ok(s) => html!(<code style="margin:0px;color:#56a2c7;white-space: pre-wrap;"> { s.to_string() }{if i==(outs.len()-1){html!()}else{html!(<br />)}}</code>),
-                      Err(s) => {
-                        has_err=true;
-                        html!(<code style="margin:0px;color:red;white-space: pre-wrap;"> { s.error_info().to_string() }{if i==(outs.len()-1){html!()}else{html!(<br />)}}</code>)},
+          <div class={ctx.props().class}>
+            <ul ref={self.hist_div_ref.clone()}
+            class="history"
+            style="text-wrap:nowrap;margin:0px;overflow-y:auto;overflow-x:auto;">
+                { for ctx.props().hist.iter().map(|(run_state,cmd_ctx,out_html)|{
+                    let (icon_class,icon,last_line,out_html) = match run_state{
+                        RunState::Ok => ("stdout-icon",IconId::BootstrapCheckLg,html!(),out_html.clone()),
+                        RunState::Err => ("stderr-icon",IconId::FontAwesomeSolidXmark,html!(),out_html.clone()),
+                        RunState::Uncompleted => ("command",IconId::FontAwesomeSolidEllipsis,html!(
+                            <div style="display:flex;flex-wrap:nowrap;">
+                                <Icon class="command" icon_id={IconId::FontAwesomeSolidEllipsis} height={"10px".to_owned()} width={"15px".to_owned()}/>
+                            </div>
+                        ),html!()),
+                    };
+                    html!{
+                        <li style="padding:0px;margin:0px;list-style:none;white-space:nowrap;">
+                        <div style="display:flex;flex-wrap:nowrap;">
+                            <Icon class={icon_class} icon_id={icon} height={"10px".to_owned()} width={"15px".to_owned()}/>
+                            <code class="command" style="white-space: pre-wrap;">
+                                {cmd_ctx}
+                            </code>
+                        </div>
+                        {last_line}
+                        <div style="padding-left:15px">
+                            {out_html.clone()}
+                        </div>
+                        </li>
                     }
-                  }
-                )}
-              };
-              let (style,icon) = if has_err{
-                ("color:red;",IconId::FontAwesomeSolidXmark)
-              }else{
-                ("color:green;",IconId::BootstrapCheckLg)
-              };
-              html!{
-                <li style="padding:0px;margin:0px;list-style:none;white-space:nowrap;">
-                  <div style="display: flex;flex-wrap: nowrap;">
-                    <Icon style={style} icon_id={icon} height={"10px".to_owned()} width={"15px".to_owned()}/>
-                    <code style="white-space: pre-wrap;">
-                      {cmd_ctx}
-                    </code>
-                  </div>
-                  <div style="padding-left:15px">
-                    {out_html}
-                  </div>
-                </li>
-              }
-            })}
-          </ul>
-          <textarea
-              class="terminal-input"
-              ref={self.input_div_ref.clone()}
-              value={self.input.clone()}
-              oninput={ctx.link().callback(|e: InputEvent| {
-                let input: web_sys::HtmlInputElement = e.target_unchecked_into();
-                TerminalMsg::UpdateInput(input.value())
-              })}
-              onkeydown={ctx.link().callback(|e: KeyboardEvent| {
-                match e.key().as_str(){
-                  "Enter" => TerminalMsg::KeyDown(Key::Enter),
-                  "ArrowUp" => TerminalMsg::KeyDown(Key::ArrowUp),
-                  "ArrowDown" => TerminalMsg::KeyDown(Key::ArrowDown),
-                  _ => TerminalMsg::None,
-                }
-              })}
-              style="width: 100%;padding:0px;border:1px solid #ccc; box-sizing: border-box;"
-          ></textarea>
-          </>
+                })}
+            </ul>
+            <textarea
+                class="input"
+                style="width:100%;"
+                ref={self.input_div_ref.clone()}
+                value={self.input.clone()}
+                oninput={ctx.link().callback(|e: InputEvent| {
+                    let input: web_sys::HtmlInputElement = e.target_unchecked_into();
+                    TerminalMsg::UpdateInput(input.value())
+                })}
+                onkeydown={ctx.link().callback(|e: KeyboardEvent| {
+                    match e.key().as_str(){
+                    "Enter" => TerminalMsg::KeyDown(Key::Enter),
+                    "ArrowUp" => TerminalMsg::KeyDown(Key::ArrowUp),
+                    "ArrowDown" => TerminalMsg::KeyDown(Key::ArrowDown),
+                    _ => TerminalMsg::None,
+                    }
+                })}
+            ></textarea>
+          </div>
         }
     }
 }

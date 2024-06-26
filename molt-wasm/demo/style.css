@@ -1,3 +1,45 @@
-.terminal-input:focus {
+.terminal .history{
+  height:50vh;
+  background: #f0f0f0;
+  padding: 10px 5px 10px 5px;
+}
+.terminal.dark .history{
+  background: #343434;
+}
+.terminal .history .command{
+  color:#333333;
+}
+.terminal.dark .history .command{
+  color:#e0e0e0;
+}
+.terminal .history .stdout-icon{
+  color:#3fb43f;
+}
+.terminal .history .stdout{
+  color:#56a2c7;
+}
+.terminal.dark .history .stdout{
+  color:#5ab5d7
+}
+.terminal .history .stderr-icon{
+  color:#ff5151;
+}
+.terminal .history .stderr{
+  color:#f0776d;
+}
+.terminal .input {
+  padding: 5px;
+  color:#333333;
+  background: #f0f0f0;
+  border: none;
+  border-top:1px solid #ccc; 
+  box-sizing: border-box;
+}
+.terminal.dark .input {
+  color:#e0e0e0;
+  background: #343434;
+  border-top:1px solid #777;;
+}
+.terminal .input:focus {
   outline: none;
 }
